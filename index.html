@@ -1,0 +1,2485 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>NOXCAT TCG</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap">
+<style>
+/* Layout: a dark card-shop counter. Header with tabs; "open" view = a Three.js stage (pack → tear → light → 3D card flips) beside the top-tier showcase; "dex" = collection grid. Single deliberate dark look in NOXCAT lime + black. */
+:root {
+  --void: #090a07;
+  --panel: #12140f;
+  --ink: #f2f5ea;
+  --muted: #9ea592;
+  --lime: #b4f01e;
+  --lime-ink: #0d1203;
+  --line: rgba(255, 255, 255, 0.1);
+  --gold: #f5c451;
+  --font-mark: "Unbounded", "Noto Sans TC", system-ui, sans-serif;
+  --font-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html { background: var(--void); }
+body {
+  margin: 0; min-height: 100vh;
+  background:
+    radial-gradient(60rem 30rem at 50% 18rem, rgba(180, 240, 30, 0.10), transparent 70%),
+    linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px) 0 0 / 100% 32px,
+    var(--void);
+  color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.6;
+  -webkit-tap-highlight-color: transparent;
+}
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 16px; padding-block: 0 48px; }
+.top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; padding-block: 18px 14px; border-bottom: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.brand > svg { width: 38px; height: 38px; flex: none; }
+.brand-name { font-family: var(--font-mark); font-weight: 800; font-size: 13px; letter-spacing: .14em; margin: 0 0 3px; display: flex; align-items: center; gap: 8px; color: var(--ink); }
+.brand-name .wordmark { height: 15px; width: auto; display: block; }
+.brand-name span { color: #8eb943; }
+.brand-set { margin: 0; font-size: 12.5px; color: var(--muted); }
+.tabs { display: flex; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); }
+.tabs button { font: inherit; font-size: 14px; font-weight: 500; color: var(--muted); background: none; border: 0; border-radius: 999px; padding: 7px 16px; cursor: pointer; display: inline-flex; gap: 8px; align-items: center; }
+.tabs button[aria-selected="true"] { background: var(--lime); color: var(--lime-ink); }
+.tabs .count { font-family: var(--font-mark); font-size: 11px; font-weight: 600; opacity: .8; font-variant-numeric: tabular-nums; }
+button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
+.btn { font: inherit; font-weight: 700; font-size: 15px; cursor: pointer; border-radius: 999px; padding: 11px 22px; border: 1px solid transparent; display: inline-flex; align-items: center; gap: 8px; transition: transform .15s, background-color .2s; }
+.btn:active { transform: scale(.97); }
+.btn-primary { background: var(--lime); color: var(--lime-ink); }
+.btn-primary:hover { background: #c6ff3d; }
+.btn-ghost { background: rgba(14,16,12,.82); color: var(--ink); border-color: var(--line); }
+.btn-ghost:hover { border-color: rgba(255,255,255,.3); }
+.btn-small { font-size: 13px; padding: 7px 14px; }
+
+.open-view { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 330px); gap: 28px; padding-top: 24px; align-items: start; }
+.stage {
+  position: relative; height: min(700px, 80vh); min-height: 580px;
+  border: 1px solid var(--line); border-radius: 28px; overflow: hidden;
+  background:
+    radial-gradient(30rem 24rem at 50% 45%, rgba(180,240,30,.13), transparent 70%),
+    radial-gradient(80rem 40rem at 50% 120%, rgba(180,240,30,.08), transparent 60%),
+    var(--panel);
+}
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; outline: none; cursor: grab; }
+.stage canvas.pointer { cursor: pointer; }
+.hud { position: absolute; left: 0; right: 0; display: grid; justify-items: center; gap: 10px; padding-inline: 16px; pointer-events: none; text-align: center; }
+.hud > * { pointer-events: auto; }
+.hud-top { top: 18px; }
+.hud-bottom { bottom: 18px; }
+.note { margin: 0; font-size: 14px; color: var(--muted); text-wrap: balance; text-shadow: 0 1px 8px rgba(0,0,0,.6); pointer-events: none; }
+.note b { color: var(--ink); }
+.callout { margin: 0; font-weight: 900; font-size: 21px; color: var(--callout, var(--lime)); text-shadow: 0 0 18px var(--callout, var(--lime)); min-height: 1.4em; pointer-events: none; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center; }
+.counter { font-family: var(--font-mark); font-weight: 600; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; pointer-events: none; }
+.stats { display: flex; gap: 18px; justify-content: center; font-size: 13px; color: var(--muted); pointer-events: none; }
+.stats b { font-family: var(--font-mark); font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+.covers { display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: rgba(14,16,12,.82); border: 1px solid var(--line); }
+.covers button { font: inherit; font-size: 12.5px; font-weight: 500; color: var(--muted); background: none; border: 0; border-radius: 999px; padding: 5px 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.covers button i { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.cover-set { font-size: 11px; color: var(--muted); padding: 0 4px 0 8px; align-self: center; white-space: nowrap; }
+.cover-sep { width: 1px; background: var(--line); margin: 4px 4px; }
+.dex-set { grid-column: 1 / -1; margin: 18px 0 0; display: flex; align-items: baseline; gap: 10px; font-size: 18px; font-weight: 900; }
+.dex-set span { font-size: 12px; font-weight: 500; color: var(--lime-ink); background: var(--lime); padding: 2px 10px; border-radius: 99px; }
+.dex-set em { font-style: normal; font-family: var(--font-mark); font-size: 13px; font-weight: 600; color: var(--muted); margin-left: auto; font-variant-numeric: tabular-nums; }
+.covers { flex-wrap: wrap; justify-content: center; border-radius: 20px; }
+.covers button[aria-pressed="true"] { background: rgba(255,255,255,.12); color: var(--ink); }
+.sum-title { margin: 0; font-size: 19px; font-weight: 900; text-wrap: balance; text-shadow: 0 1px 10px rgba(0,0,0,.6); pointer-events: none; }
+.sum-title span { color: var(--sum-c, var(--lime)); }
+.loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 14px; pointer-events: none; }
+.fallback { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; color: var(--muted); }
+
+.side { display: grid; gap: 16px; }
+.side h2 { margin: 0; font-size: 18px; font-weight: 900; text-wrap: balance; }
+.side-intro p { margin: 0; color: var(--muted); font-size: 14px; }
+.chase { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; perspective: 1000px; padding-block: 6px; }
+.chase .card { cursor: pointer; }
+.chase .card:nth-child(1) { --rot: -3deg; }
+.chase .card:nth-child(2) { --oy: 12px; }
+.chase .card:nth-child(3) { --rot: 3deg; }
+.tiers { display: grid; gap: 6px; border: 1px solid var(--line); border-radius: 16px; padding: 12px 16px; background: var(--panel); }
+.tiers h3 { margin: 0 0 4px; font-size: 14px; }
+.tier-row { display: grid; grid-template-columns: 44px 1fr auto; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
+.tier-row b { font-family: var(--font-mark); font-weight: 800; font-size: 12px; color: var(--tc); }
+.tier-row span:last-child { font-variant-numeric: tabular-nums; }
+details.rates { border: 1px solid var(--line); border-radius: 16px; padding: 12px 16px; background: var(--panel); }
+details.rates summary { cursor: pointer; font-weight: 700; font-size: 14px; }
+details.rates ul { margin: 10px 0 0; padding-left: 18px; color: var(--muted); font-size: 13px; display: grid; gap: 4px; }
+details.rates li b { color: var(--ink); font-weight: 500; }
+details.rates p { margin: 10px 0 0; font-size: 12px; color: var(--muted); }
+
+.battle-ov { position: fixed; inset: 0; z-index: 80; background: #070806; }
+.battle-ov iframe { width: 100%; height: 100%; border: 0; display: block; }
+.sec-head .btn { text-decoration: none; margin-top: 6px; }
+.rules { padding-top: 28px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+@media (min-width: 900px) { .rules { grid-template-columns: repeat(3, minmax(0, 1fr)); } .rule-card.wide { grid-column: span 2; } .rule-card.full { grid-column: 1 / -1; } }
+.rule-card { border: 1px solid var(--line); border-radius: 18px; background: var(--panel); padding: 18px 20px; display: grid; gap: 10px; align-content: start; }
+.rule-card h3 { margin: 0; font-size: 17px; font-weight: 900; }
+.rule-card ol, .rule-card ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; color: #c9cfbe; font-size: 14.5px; line-height: 1.65; }
+.rule-card li ul { margin-top: 6px; }
+.rule-card b { color: var(--ink); }
+.rule-card dl { margin: 0; display: grid; gap: 4px; font-size: 14.5px; line-height: 1.65; }
+.rule-card dt { font-weight: 700; color: var(--lime); }
+.rule-card dd { margin: 0 0 6px; color: #c9cfbe; }
+.rule-card table { border-collapse: collapse; font-size: 14px; line-height: 1.55; }
+.rule-card th { text-align: left; white-space: nowrap; padding: 6px 14px 6px 0; color: var(--ink); vertical-align: top; }
+.rule-card td { padding: 6px 0; color: #c9cfbe; border-top: 1px solid var(--line); }
+.rule-card tr:first-child td { border-top: 0; }
+.rule-note { margin: 0; color: var(--muted); font-size: 13px; }
+.type-table { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.type-row { display: grid; gap: 6px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font-size: 13px; color: var(--muted); }
+.type-row > b { display: flex; align-items: center; gap: 8px; font-size: 15px; color: var(--ink); }
+.type-row span { display: flex; align-items: center; gap: 6px; }
+.tdot { width: 20px; height: 20px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 11px; font-weight: 900; color: #0d1203; background: var(--tc); flex: none; }
+.dex-set.basic span { background: #2b2f26; color: var(--ink); }
+.dex-view { padding-top: 28px; display: grid; gap: 20px; }
+.dex-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 14px; }
+.dex-head h2 { margin: 0; font-size: 22px; font-weight: 900; }
+.dex-head p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+.bar { height: 8px; border-radius: 8px; background: #1e2119; overflow: hidden; margin-top: 10px; max-width: 360px; }
+.bar i { display: block; height: 100%; background: var(--lime); border-radius: 8px; transition: width .5s; }
+.rar-chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.rar-chip { font-size: 12.5px; border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rar-chip b { color: var(--ink); font-weight: 700; }
+.rar-chip em { font-style: normal; font-family: var(--font-mark); font-weight: 800; font-size: 11px; color: var(--tc); margin-right: 4px; }
+.dex-bal { font-size: 13px; color: var(--muted); align-self: center; }
+.dex-bal b { font-family: var(--font-mark); font-weight: 600; color: var(--lime); }
+.dex-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px; perspective: 1200px; }
+.slot { position: relative; }
+.slot .card { cursor: pointer; }
+.qty { position: absolute; z-index: 5; right: -6px; top: -8px; background: var(--ink); color: var(--void); font-family: var(--font-mark); font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 99px; }
+.locked { aspect-ratio: 63 / 88; border-radius: 5% / 3.6%; border: 1.5px dashed rgba(255,255,255,.14); display: grid; place-items: center; align-content: center; gap: 6px; color: #5d6356; text-align: center; background: repeating-linear-gradient(135deg, rgba(255,255,255,.02) 0 8px, transparent 8px 16px); }
+.locked .num { font-family: var(--font-mark); font-weight: 600; font-size: 13px; }
+.locked .q { font-family: var(--font-mark); font-weight: 800; font-size: 34px; color: #3a3f33; }
+.locked .r { font-size: 12px; color: var(--tc); opacity: .7; font-family: var(--font-mark); font-weight: 800; }
+
+.modal { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 16px; background: rgba(5,6,4,.84); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.modal-inner { display: grid; justify-items: center; gap: 16px; perspective: 1400px; }
+.modal-card { width: min(380px, 84vw, calc((100vh - 140px) * 63 / 88)); }
+.modal-tip { margin: 0; color: var(--muted); font-size: 13px; }
+
+/* five-pack results */
+.multi { position: fixed; inset: 0; z-index: 45; overflow-y: auto; overscroll-behavior: contain; background: rgba(5,6,4,.94); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); padding: calc(env(safe-area-inset-top, 0px) + 22px) 16px calc(env(safe-area-inset-bottom, 0px) + 28px); }
+.multi-inner { max-width: 820px; margin: 0 auto; display: grid; gap: 20px; }
+.multi-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px; }
+.multi-head h2 { margin: 8px 0 2px; font-size: clamp(20px, 3.4vw, 28px); font-weight: 900; line-height: 1.3; }
+.multi-head h2 span { color: var(--best, var(--lime)); }
+.multi-sub { margin: 0; color: var(--muted); font-size: 14px; }
+.multi-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.multi-chips span { font-size: 12px; color: var(--muted); border: 1px solid var(--line); border-radius: 99px; padding: 3px 10px; }
+.multi-chips em { font-style: normal; font-family: var(--font-mark); font-weight: 800; color: var(--tc); margin-right: 4px; }
+.mpack h3 { margin: 0 0 8px; font-family: var(--font-mark); font-size: 11.5px; font-weight: 600; letter-spacing: .12em; color: var(--muted); }
+.mrow { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: clamp(6px, 1.4vw, 14px); }
+.mslot { position: relative; aspect-ratio: 63 / 88; perspective: 900px; }
+.mslot .flip { position: absolute; inset: 0; transform-style: preserve-3d; transform: rotateY(180deg); transition: transform .6s cubic-bezier(.2,.75,.2,1); }
+.mslot.on .flip { transform: rotateY(0deg); }
+.mslot .face { position: absolute; inset: 0; -webkit-backface-visibility: hidden; backface-visibility: hidden; }
+.mslot .face.back { transform: rotateY(180deg); border-radius: 5% / 3.6%; background: #1b1e16 center / cover no-repeat; box-shadow: 0 10px 22px rgba(0,0,0,.5); }
+.mslot .card { cursor: pointer; box-shadow: 0 10px 22px rgba(0,0,0,.5); }
+.mslot.glow::after { content: ""; position: absolute; inset: -3px; border-radius: 6% / 4.4%; box-shadow: 0 0 0 2px var(--tc), 0 0 24px var(--tc); opacity: 0; transition: opacity .4s .35s; pointer-events: none; }
+.mslot.on.glow::after { opacity: 1; }
+.mslot.t-SEC.glow::after { box-shadow: 0 0 0 2px #fff, 0 0 18px #ff6ad5, 0 0 36px #6ad5ff; }
+.mnew { position: absolute; z-index: 3; top: -7px; left: -5px; background: var(--lime); color: var(--lime-ink); font-family: var(--font-mark); font-weight: 800; font-size: 10px; padding: 2px 7px; border-radius: 99px; opacity: 0; transform: scale(.6); transition: opacity .3s .4s, transform .3s .4s; pointer-events: none; }
+.mslot.on .mnew { opacity: 1; transform: none; }
+.multi-foot { position: sticky; bottom: calc(-28px - env(safe-area-inset-bottom, 0px)); display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; padding: 18px 0 calc(env(safe-area-inset-bottom, 0px) + 20px); margin-bottom: calc(-28px - env(safe-area-inset-bottom, 0px)); background: linear-gradient(rgba(5,6,4,0), rgba(5,6,4,.96) 40%); }
+@media (max-width: 520px) { .mnew { font-size: 8.5px; padding: 1px 5px; } .mpack h3 { margin-bottom: 6px; } }
+@media (prefers-reduced-motion: reduce) { .mslot .flip, .mslot.glow::after, .mnew { transition: none; } }
+
+/* image-based card (showcase, collection, zoom) */
+.card {
+  position: relative; width: 100%; aspect-ratio: 63 / 88; border-radius: 5% / 3.6%;
+  background: #15170f; box-shadow: 0 14px 30px rgba(0,0,0,.5);
+  transform: translate3d(var(--ox, 0px), var(--oy, 0px), 0) rotate(var(--rot, 0deg)) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  transition: transform .2s ease-out;
+  overflow: hidden;
+}
+.card img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; transition: opacity .3s; }
+.card img.ready { opacity: 1; }
+.shine, .glare { position: absolute; inset: 0; pointer-events: none; }
+.glare { background: radial-gradient(circle at var(--mx, 50%) var(--my, 20%), rgba(255,255,255,.35), transparent 45%); mix-blend-mode: overlay; opacity: .6; }
+.t-R .shine { background: linear-gradient(115deg, transparent 35%, rgba(255,255,255,.45) 50%, transparent 65%); background-size: 260% 260%; background-position: var(--px, 30%) var(--py, 30%); mix-blend-mode: soft-light; }
+.t-SR .shine {
+  background: repeating-linear-gradient(55deg, rgba(255,255,255,.07) 0 4px, transparent 4px 10px), linear-gradient(115deg, transparent 18%, hsla(320,100%,70%,.6) 34%, hsla(55,100%,65%,.6) 44%, hsla(150,100%,60%,.6) 54%, hsla(205,100%,65%,.6) 64%, transparent 80%);
+  background-size: 100% 100%, 260% 260%; background-position: 0 0, var(--px, 40%) var(--py, 40%); mix-blend-mode: color-dodge; opacity: .42;
+}
+.t-SSR .shine {
+  background: radial-gradient(circle, rgba(255,240,180,.85) 0 1px, transparent 2px) 0 0 / 22px 22px, linear-gradient(120deg, transparent 20%, rgba(255,214,90,.75) 40%, rgba(255,255,230,.8) 50%, rgba(255,170,40,.7) 60%, transparent 80%);
+  background-size: 22px 22px, 280% 280%; background-position: var(--sx, 0) var(--sy, 0), var(--px, 40%) var(--py, 40%); mix-blend-mode: color-dodge; opacity: .5;
+}
+.t-UR .shine {
+  background: radial-gradient(circle, rgba(220,250,255,.9) 0 1px, transparent 2px) 0 0 / 16px 16px, linear-gradient(125deg, transparent 15%, hsla(190,100%,75%,.55) 35%, hsla(260,100%,80%,.45) 50%, hsla(160,100%,75%,.5) 65%, transparent 85%);
+  background-size: 16px 16px, 260% 260%; background-position: var(--sx, 0) var(--sy, 0), var(--px, 40%) var(--py, 40%); mix-blend-mode: color-dodge; opacity: .5;
+}
+.t-SEC .shine {
+  background: repeating-linear-gradient(-35deg, rgba(255,255,255,.08) 0 3px, transparent 3px 8px), linear-gradient(110deg, hsla(0,100%,65%,.55), hsla(60,100%,60%,.55) 20%, hsla(130,100%,60%,.55) 40%, hsla(200,100%,65%,.55) 60%, hsla(280,100%,70%,.55) 80%, hsla(340,100%,65%,.55));
+  background-size: 100% 100%, 300% 300%; background-position: 0 0, var(--px, 40%) var(--py, 40%); mix-blend-mode: color-dodge; opacity: .5;
+}
+
+@media (max-width: 920px) { .open-view { grid-template-columns: minmax(0, 1fr); } .side { max-width: 560px; margin: 0 auto; width: 100%; } }
+@media (max-width: 520px) {
+  .tabs button { padding: 7px 12px; }
+  .brand-set { display: none; }
+  .stage { border-radius: 22px; height: 76vh; min-height: 540px; }
+  .callout { font-size: 17px; }
+  .covers button { padding: 5px 9px; font-size: 12px; }
+}
+@media (prefers-reduced-motion: reduce) { .btn, .card, .card img { transition: none; } }
+
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body { background: #050604; }
+.nav { position: fixed; top: 0; left: 0; right: 0; z-index: 40; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: calc(env(safe-area-inset-top, 0px) + 12px) 20px 14px; background: linear-gradient(rgba(5,6,4,.88), rgba(5,6,4,0)); }
+.nav-brand { display: flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; }
+.nav-brand > svg:first-child { width: 32px; height: 32px; flex: none; }
+.nav-brand .wordmark { height: 14px; width: auto; display: block; }
+.nav-brand .tcg { font-family: var(--font-mark); font-weight: 800; font-size: 12px; letter-spacing: .14em; color: #8eb943; }
+.nav-links { display: flex; gap: 4px; align-items: center; }
+.nav-links a { color: #c3c9b6; text-decoration: none; font-size: 14px; padding: 7px 12px; border-radius: 999px; }
+.nav-links a:hover { color: var(--ink); background: rgba(255,255,255,.06); }
+.nav-links .cta { background: var(--lime); color: var(--lime-ink); font-weight: 700; }
+.nav-links .cta:hover { background: #c6ff3d; color: var(--lime-ink); }
+.nav-links .count { font-family: var(--font-mark); font-size: 11px; font-weight: 600; opacity: .75; font-variant-numeric: tabular-nums; }
+a:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
+@media (max-width: 640px) { .nav-links a:not(.cta):not(.dexlink):not(.js-battle):not(.js-market) { display: none; } .nav-links a { padding-inline: 9px; } .nav { padding-inline: 14px; } .nav-brand .tcg { display: none; } }
+.nav-links a { white-space: nowrap; }
+[id] { scroll-margin-top: 76px; }
+@media (max-width: 430px) { .nav { gap: 6px; padding-inline: 10px; } .nav-brand .wordmark { display: none; } .nav-links .dexlink { display: none; } .nav-links { gap: 2px; } .nav-links a { font-size: 13px; padding-inline: 8px; } }
+.story { position: relative; height: 640vh; }
+.story-sticky { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; }
+#story-gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+.scene { position: absolute; inset: 0; pointer-events: none; opacity: var(--o, 0); }
+.ghost { position: absolute; left: 50%; top: 40%; white-space: nowrap; font-weight: 900; font-size: clamp(76px, 15vw, 250px); line-height: 1; letter-spacing: .01em; color: rgba(255,255,255,.5); filter: blur(9px); transform: translate(calc(-50% + (0.5 - var(--l, .5)) * 34vw), -50%); user-select: none; font-family: var(--font-body); }
+.sharp { position: absolute; left: 16px; right: 16px; bottom: 13vh; text-align: center; display: grid; justify-items: center; gap: 12px; filter: blur(calc((1 - var(--o, 0)) * 12px)); transform: translateY(calc((1 - var(--o, 0)) * 26px)); }
+.sharp.left { left: max(16px, 6vw); right: 16px; text-align: left; justify-items: start; max-width: 27rem; bottom: 16vh; }
+.pill { display: inline-flex; align-items: center; font-size: 12px; padding: 4px 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,.24); color: var(--ink); background: rgba(255,255,255,.06); letter-spacing: .06em; font-weight: 500; }
+.sharp h1, .sharp h2 { margin: 0; font-weight: 900; font-size: clamp(30px, 4.4vw, 54px); line-height: 1.15; text-wrap: balance; text-shadow: 0 2px 22px rgba(0,0,0,.7); }
+.sharp p { margin: 0; color: #c9cfbe; font-size: clamp(14px, 1.4vw, 17px); max-width: 32rem; text-wrap: balance; text-shadow: 0 1px 14px rgba(0,0,0,.8); }
+.sharp .btn, .sharp a { pointer-events: auto; }
+.sharp .btn { text-decoration: none; }
+#tier-code { font-family: var(--font-mark); font-weight: 800; }
+.tier-dots { display: flex; gap: 8px; margin-top: 4px; }
+.tier-dots i { width: 30px; height: 4px; border-radius: 4px; background: rgba(255,255,255,.16); transition: background-color .3s; }
+.tier-dots i.on { background: var(--tc); }
+.flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+.scroll-hint { position: absolute; bottom: 4vh; left: 50%; transform: translateX(-50%); font-size: 12px; color: var(--muted); letter-spacing: .3em; pointer-events: none; }
+.story.no-gl { height: auto; }
+.story.no-gl .story-sticky { position: relative; height: auto; display: grid; gap: 64px; padding-block: 120px 40px; }
+.story.no-gl .scene { position: relative; opacity: 1; }
+.story.no-gl .ghost, .story.no-gl .scroll-hint, .story.no-gl .flash { display: none; }
+.story.no-gl .sharp { position: relative; filter: none; transform: none; bottom: auto; }
+.story.no-gl .sharp.left { left: 0; right: auto; margin-inline: max(16px, 6vw) 16px; }
+.sec-head { padding-top: 104px; display: grid; gap: 10px; justify-items: start; scroll-margin-top: 0; }
+.sec-head h2 { margin: 0; font-size: clamp(26px, 3.4vw, 40px); font-weight: 900; text-wrap: balance; }
+.sec-head p { margin: 0; color: var(--muted); max-width: 40rem; }
+.site-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); margin-top: 72px; padding-top: 24px; }
+</style>
+</head>
+<body>
+<nav class="nav" aria-label="主選單">
+  <a class="nav-brand" href="#story" aria-label="NOXCAT TCG 回到最上面"><svg viewBox="0 0 140 140" aria-hidden="true"><rect width="140" height="140" rx="32" fill="#8eb943"/><g transform="translate(16.9 21.7)"><path d="M3.9 14.8Q3.4 15.2 2.8 17.3Q2.2 19.4 2.2 22.2Q2.2 25.1 3.4 33.6Q4.6 42.0 3.4 45.7Q2.1 49.4 1.3 53.2Q0.5 57.1 0.2 59.4Q0.0 61.6 0.1 66.8Q0.2 71.9 0.7 74.8Q1.1 77.8 2.1 81.1Q3.1 84.5 4.9 87.7Q6.8 90.9 8.3 92.3Q9.9 93.8 12.0 94.8Q14.1 95.9 16.4 96.2Q18.6 96.6 51.5 96.6Q84.4 96.6 86.7 96.2Q89.0 95.8 91.1 94.9Q93.2 94.0 94.9 92.9Q96.5 91.8 98.1 90.2Q99.6 88.6 101.3 85.8Q103.0 83.0 104.1 79.8Q105.1 76.6 105.7 72.8Q106.2 68.9 106.1 63.2Q105.9 57.5 105.1 54.2Q104.2 51.0 102.4 47.0Q100.6 43.0 97.9 39.5Q95.2 36.0 92.6 33.6Q90.0 31.2 86.5 28.9Q83.0 26.6 80.2 25.2Q77.5 23.9 73.5 22.4Q69.5 21.0 65.5 20.0Q61.5 19.0 58.1 14.1Q54.6 9.1 53.1 7.2Q51.5 5.4 49.2 3.3Q47.0 1.2 45.6 0.6Q44.2 0.0 43.3 0.0Q42.4 0.0 41.7 0.3Q41.0 0.6 39.9 2.1Q38.8 3.5 37.8 6.4Q36.9 9.2 36.3 13.8Q35.8 18.2 35.2 18.8Q34.8 19.4 29.1 21.0Q23.5 22.6 19.0 19.8Q14.5 16.9 12.6 15.9Q10.6 15.0 8.2 14.5Q5.8 14.0 5.1 14.2Q4.4 14.4 3.9 14.8Z" fill="#1f1c1b"/><path d="M14.8 41.4Q15.9 40.4 16.9 40.3Q18.0 40.2 19.2 40.9Q20.5 41.5 21.8 42.9Q23.0 44.4 23.9 46.3Q24.8 48.2 25.1 49.9Q25.5 51.6 25.4 53.7Q25.4 55.8 24.8 57.2Q24.1 58.6 23.1 59.3Q22.1 60.0 21.0 59.9Q19.9 59.9 18.8 59.2Q17.8 58.6 16.4 56.9Q15.0 55.1 14.3 53.5Q13.6 51.9 13.2 50.4Q12.9 48.9 12.9 47.0Q12.9 45.1 13.3 43.8Q13.8 42.4 14.8 41.4ZM35.9 33.5Q36.9 32.9 37.9 32.9Q38.9 32.9 39.9 33.4Q41.0 34.0 42.1 35.1Q43.1 36.2 44.2 38.3Q45.2 40.4 45.7 42.1Q46.1 43.8 46.1 45.9Q46.1 48.0 45.6 49.4Q45.1 50.8 44.1 51.6Q43.0 52.5 42.0 52.6Q41.0 52.6 39.8 52.0Q38.5 51.4 37.2 49.8Q35.9 48.2 35.0 46.2Q34.1 44.2 33.8 42.8Q33.5 41.2 33.6 38.9Q33.8 36.5 34.4 35.3Q35.0 34.1 35.9 33.5Z" fill="#ffffff"/></g></svg><svg class="wordmark" viewBox="0 0 272.88 35.75" role="img" aria-label="NOXCAT"><path d="M228.8 2.2Q228.5 2.8 228.5 6.6Q228.5 10.5 228.6 10.7Q228.6 10.9 228.8 11.1Q229.0 11.2 229.6 11.4Q230.1 11.6 235.7 11.6Q241.2 11.6 241.3 11.6Q241.4 11.5 241.8 11.5Q242.2 11.5 242.3 11.6Q242.4 11.6 242.8 11.6Q243.1 11.6 243.5 11.9Q243.9 12.1 244.0 12.4Q244.1 12.8 244.1 13.4Q244.1 14.0 244.1 14.1Q244.0 14.1 244.0 14.7Q244.0 15.2 244.1 15.3Q244.1 15.4 244.1 15.8Q244.1 16.1 244.1 16.2Q244.0 16.2 244.0 24.2Q244.0 32.2 244.2 32.9Q244.4 33.6 244.6 33.8Q244.8 34.0 245.1 34.1Q245.4 34.2 245.8 34.2Q246.1 34.2 246.2 34.2Q246.2 34.1 246.9 34.1Q247.6 34.1 247.7 34.2Q247.8 34.2 251.6 34.2Q255.5 34.2 255.6 34.2Q255.6 34.1 256.0 34.1Q256.4 34.1 256.6 33.9Q256.9 33.8 257.1 33.2Q257.2 32.8 257.2 22.7Q257.2 12.6 257.3 12.4Q257.4 12.2 257.6 12.0Q257.9 11.8 258.1 11.7Q258.2 11.6 260.4 11.6Q262.6 11.6 262.7 11.6Q262.8 11.5 262.9 11.6Q263.0 11.6 267.1 11.6Q271.2 11.6 271.8 11.4Q272.4 11.2 272.6 10.7Q272.9 10.1 272.9 6.6Q272.9 3.1 272.7 2.6Q272.5 2.0 272.3 1.8Q272.1 1.6 271.8 1.5Q271.4 1.4 250.7 1.4Q230.0 1.4 229.6 1.6Q229.1 1.8 228.8 2.2ZM183.0 30.3Q182.0 32.4 182.0 32.9Q182.0 33.5 182.1 33.7Q182.2 33.9 182.8 34.1Q183.2 34.2 184.3 34.2Q185.4 34.2 185.4 34.2Q185.5 34.1 186.1 34.1Q186.6 34.1 186.7 34.2Q186.8 34.2 187.4 34.2Q188.0 34.2 188.1 34.2Q188.1 34.1 190.8 34.2Q193.5 34.2 194.1 34.1Q194.8 33.9 195.1 33.6Q195.4 33.2 196.2 31.1Q197.1 29.0 197.6 28.6Q198.0 28.1 198.6 28.0Q199.2 27.9 205.4 27.9Q211.6 27.9 212.2 28.0Q212.9 28.1 213.3 28.5Q213.8 28.9 214.7 31.1Q215.6 33.2 215.9 33.6Q216.2 33.9 216.5 34.0Q216.8 34.1 220.8 34.1Q224.9 34.1 224.9 34.2Q225.0 34.2 225.9 34.2Q226.9 34.2 226.9 34.2Q227.0 34.1 227.8 34.1Q228.5 34.0 228.8 33.8Q229.0 33.5 228.9 32.8Q228.9 32.0 228.4 31.2Q228.0 30.4 226.5 26.9Q225.0 23.5 223.8 20.9Q222.5 18.4 222.4 17.9Q222.2 17.5 220.6 13.9Q218.9 10.2 218.7 9.6Q218.5 9.0 218.0 8.1Q217.5 7.1 216.6 4.9Q215.6 2.6 215.2 2.2Q214.9 1.9 214.3 1.6Q213.8 1.4 212.8 1.4Q211.9 1.4 211.8 1.4Q211.8 1.5 211.4 1.4Q211.1 1.4 204.2 1.4Q197.4 1.4 196.9 1.5Q196.5 1.6 196.2 1.8Q195.9 2.0 195.5 2.6Q195.1 3.2 194.4 5.1Q193.6 6.9 193.0 8.1Q192.4 9.2 192.3 9.6Q192.2 9.9 191.8 10.8Q191.2 11.8 190.9 12.6Q190.6 13.5 190.0 14.7Q189.4 15.9 189.2 16.4Q189.0 17.0 187.6 20.1Q186.1 23.1 186.0 23.6Q185.9 24.0 185.1 25.5Q184.4 27.0 184.2 27.6Q184.0 28.2 183.0 30.3ZM204.9 10.6Q205.4 10.1 205.5 10.1Q205.6 10.1 205.9 10.3Q206.1 10.5 208.1 14.7Q210.0 18.9 210.1 19.3Q210.1 19.8 209.8 20.1Q209.5 20.4 209.3 20.4Q209.1 20.5 208.4 20.5Q207.6 20.5 207.6 20.4Q207.5 20.4 207.1 20.4Q206.8 20.4 206.7 20.4Q206.6 20.5 204.2 20.5Q201.9 20.5 201.6 20.4Q201.4 20.2 201.2 20.0Q201.0 19.8 201.1 19.2Q201.1 18.6 202.8 14.9Q204.5 11.2 204.5 11.1Q204.5 11.0 204.9 10.6ZM94.5 1.8Q94.2 2.0 94.2 2.3Q94.2 2.6 94.8 3.4Q95.4 4.2 100.2 9.5Q105.1 14.8 105.9 15.7Q106.8 16.6 106.9 16.9Q107.0 17.2 106.9 17.6Q106.9 18.0 106.6 18.4Q106.4 18.8 105.3 19.9Q104.2 21.0 100.7 25.2Q97.1 29.5 95.9 30.8Q94.6 32.1 94.4 32.6Q94.1 33.0 94.1 33.2Q94.1 33.5 94.2 33.7Q94.4 33.9 94.9 34.1Q95.5 34.2 96.3 34.2Q97.1 34.2 97.2 34.2Q97.2 34.1 98.1 34.1Q98.9 34.1 98.9 34.2Q99.0 34.2 99.4 34.2Q99.9 34.2 99.9 34.2Q100.0 34.1 100.9 34.1Q101.9 34.1 101.9 34.2Q102.0 34.2 104.4 34.2Q106.8 34.1 106.8 34.2Q106.9 34.2 107.2 34.2Q107.5 34.2 107.9 34.1Q108.4 34.0 108.7 33.8Q109.0 33.6 109.4 33.2Q109.8 32.9 111.9 30.1Q114.1 27.2 114.4 26.9Q114.8 26.6 115.0 26.5Q115.2 26.4 115.6 26.4Q115.9 26.5 116.3 26.9Q116.8 27.4 117.8 28.8Q118.9 30.2 119.5 30.9Q120.1 31.6 120.4 32.1Q120.8 32.6 121.3 33.2Q121.9 33.8 122.3 33.9Q122.8 34.1 124.1 34.1Q125.4 34.1 125.4 34.2Q125.5 34.2 126.5 34.2Q127.5 34.2 127.6 34.2Q127.6 34.1 130.6 34.2Q133.6 34.2 133.7 34.2Q133.8 34.1 134.8 34.1Q135.9 34.1 136.2 33.9Q136.5 33.6 136.6 33.4Q136.6 33.2 136.6 33.1Q136.5 32.9 135.9 32.1Q135.4 31.2 133.5 29.2Q131.6 27.1 131.4 26.8Q131.1 26.4 129.1 24.0Q127.0 21.6 126.4 21.0Q125.8 20.4 124.8 19.2Q123.9 18.0 123.9 17.5Q123.9 17.0 124.1 16.6Q124.2 16.2 130.1 10.0Q135.9 3.8 136.2 3.3Q136.5 2.9 136.6 2.6Q136.6 2.4 136.6 2.1Q136.5 1.9 136.4 1.8Q136.2 1.6 135.9 1.5Q135.5 1.4 129.4 1.4Q123.2 1.4 122.8 1.5Q122.4 1.6 122.0 1.9Q121.6 2.1 121.2 2.6Q120.8 3.0 118.9 5.2Q117.1 7.5 116.5 8.1Q115.9 8.8 115.7 8.8Q115.5 8.9 115.1 8.8Q114.8 8.6 113.2 6.9Q111.8 5.2 110.8 4.1Q109.9 2.9 109.4 2.4Q109.0 2.0 108.5 1.8Q108.0 1.5 107.8 1.4Q107.5 1.4 101.3 1.4Q95.1 1.4 94.9 1.4Q94.8 1.5 94.5 1.8ZM0.6 1.8Q0.4 2.0 0.2 2.3Q0.1 2.6 0.1 14.7Q0.1 26.8 0.1 26.8Q0.0 26.9 0.0 27.2Q0.0 27.6 0.1 27.7Q0.1 27.8 0.1 30.4Q0.1 33.1 0.3 33.5Q0.5 33.9 0.7 34.0Q0.9 34.1 1.2 34.2Q1.5 34.2 4.2 34.2Q7.0 34.2 7.1 34.2Q7.1 34.1 8.2 34.1Q9.2 34.1 9.3 34.2Q9.4 34.2 10.5 34.2Q11.6 34.1 11.7 34.2Q11.8 34.2 12.1 34.2Q12.4 34.2 12.8 34.1Q13.1 33.9 13.2 33.7Q13.4 33.5 13.5 33.0Q13.6 32.5 13.6 24.7Q13.6 16.9 13.6 16.8Q13.5 16.8 13.5 16.1Q13.5 15.5 13.6 15.4Q13.6 15.4 13.6 15.0Q13.6 14.6 13.8 14.4Q14.0 14.1 14.2 14.2Q14.4 14.2 14.7 14.6Q15.0 15.0 17.2 19.4Q19.5 23.8 19.5 23.9Q19.5 24.0 20.4 25.8Q21.4 27.6 21.4 27.9Q21.5 28.1 21.6 28.2Q21.8 28.4 22.9 30.8Q24.1 33.1 24.4 33.4Q24.8 33.8 25.2 33.9Q25.6 34.1 26.0 34.1Q26.4 34.1 26.4 34.2Q26.5 34.2 27.4 34.2Q28.4 34.2 28.4 34.2Q28.5 34.1 29.4 34.1Q30.2 34.1 30.3 34.2Q30.4 34.2 34.8 34.2Q39.1 34.2 39.2 34.2Q39.2 34.1 40.8 34.1Q42.4 34.1 42.8 33.9Q43.1 33.6 43.2 33.4Q43.4 33.1 43.4 31.7Q43.4 30.2 43.4 30.2Q43.5 30.1 43.4 29.9Q43.4 29.6 43.4 29.2Q43.4 28.9 43.4 28.8Q43.5 28.8 43.5 16.1Q43.5 3.4 43.4 3.3Q43.4 3.2 43.4 2.9Q43.4 2.6 43.0 2.1Q42.6 1.6 42.2 1.5Q41.8 1.4 36.6 1.4Q31.4 1.4 31.2 1.4Q31.0 1.5 30.8 1.8Q30.5 2.0 30.4 2.4Q30.2 2.9 30.2 12.0Q30.2 21.1 30.2 21.2Q30.1 21.2 30.1 21.6Q30.1 21.9 29.9 22.1Q29.8 22.4 29.4 22.1Q29.1 21.9 28.4 20.3Q27.6 18.8 27.4 18.2Q27.2 17.6 26.8 16.9Q26.4 16.1 26.0 15.2Q25.6 14.2 24.2 11.4Q22.8 8.6 22.5 7.9Q22.2 7.2 22.0 6.9Q21.8 6.5 20.8 4.5Q19.9 2.5 19.5 2.1Q19.1 1.8 18.6 1.6Q18.0 1.4 9.7 1.4Q1.4 1.4 1.1 1.4Q0.9 1.5 0.6 1.8ZM138.4 9.2Q137.8 10.1 137.2 11.1Q136.8 12.1 136.3 13.3Q135.9 14.5 135.8 15.2Q135.8 16.0 135.7 16.1Q135.6 16.1 135.6 16.7Q135.6 17.2 135.6 17.3Q135.5 17.4 135.6 19.0Q135.8 20.6 136.3 22.2Q136.9 23.9 137.4 24.8Q137.9 25.6 138.5 26.5Q139.1 27.4 140.2 28.5Q141.4 29.6 142.9 30.8Q144.5 31.9 146.4 32.8Q148.4 33.8 150.3 34.4Q152.2 35.0 152.9 35.1Q153.5 35.1 154.2 35.3Q155.0 35.5 155.4 35.5Q155.8 35.5 155.8 35.6Q155.9 35.6 159.1 35.7Q162.2 35.8 162.3 35.7Q162.4 35.6 163.0 35.6Q163.6 35.6 163.7 35.6Q163.8 35.5 164.8 35.4Q165.8 35.2 166.1 35.1Q166.4 35.0 166.7 35.0Q167.0 35.0 168.7 34.5Q170.4 34.0 172.2 33.1Q174.1 32.2 175.0 31.7Q175.9 31.1 176.8 30.4Q177.6 29.8 178.8 28.5Q180.0 27.2 180.3 26.8Q180.6 26.2 180.7 25.8Q180.8 25.2 180.3 24.8Q179.9 24.4 179.1 24.1Q178.2 23.9 177.4 23.4Q176.5 23.0 175.7 22.8Q174.9 22.5 174.4 22.2Q174.0 22.0 173.7 21.9Q173.4 21.9 172.1 21.3Q170.9 20.8 170.6 20.8Q170.4 20.8 170.1 20.9Q169.8 21.0 168.8 22.0Q167.8 23.0 166.9 23.6Q166.0 24.2 165.0 24.7Q164.0 25.1 163.3 25.3Q162.6 25.5 161.8 25.6Q160.9 25.6 160.8 25.7Q160.8 25.8 159.1 25.7Q157.5 25.6 156.5 25.4Q155.5 25.1 153.9 24.4Q152.4 23.6 151.3 22.6Q150.2 21.5 149.8 20.8Q149.4 20.0 149.2 18.8Q149.0 17.5 149.1 17.4Q149.1 17.4 149.1 16.9Q149.1 16.5 149.6 15.5Q150.0 14.5 151.2 13.2Q152.5 12.0 153.5 11.4Q154.5 10.9 156.3 10.4Q158.1 9.9 159.8 9.9Q161.4 9.9 162.1 10.1Q162.9 10.4 163.4 10.4Q163.9 10.5 164.2 10.6Q164.6 10.8 165.8 11.4Q166.9 12.0 167.5 12.5Q168.1 13.0 168.8 13.7Q169.4 14.4 169.6 14.5Q169.9 14.6 170.6 14.6Q171.4 14.5 172.0 14.2Q172.6 13.9 175.0 13.1Q177.4 12.2 178.8 11.6Q180.2 11.0 180.5 10.8Q180.8 10.5 180.8 10.2Q180.9 9.9 180.8 9.6Q180.6 9.2 180.3 8.8Q180.0 8.4 178.7 7.1Q177.4 5.8 175.9 4.7Q174.4 3.6 172.3 2.6Q170.2 1.6 167.9 1.0Q165.5 0.4 164.8 0.3Q164.1 0.2 164.1 0.2Q164.0 0.1 163.2 0.1Q162.5 0.1 162.4 0.1Q162.4 0.0 159.6 0.0Q156.8 0.0 156.7 0.1Q156.6 0.1 156.1 0.1Q155.5 0.1 152.9 0.7Q150.2 1.2 148.2 2.1Q146.2 2.9 146.1 3.0Q146.0 3.1 145.2 3.5Q144.4 3.9 143.4 4.6Q142.4 5.2 140.8 6.8Q139.1 8.4 138.4 9.2ZM50.4 9.1Q49.6 10.1 48.9 11.5Q48.2 12.9 47.8 14.5Q47.4 16.1 47.4 17.9Q47.4 19.6 47.9 21.3Q48.4 23.0 49.0 24.2Q49.6 25.4 50.4 26.5Q51.2 27.6 52.3 28.7Q53.4 29.8 54.6 30.7Q55.9 31.6 57.7 32.6Q59.5 33.5 60.9 34.0Q62.4 34.5 63.6 34.8Q64.8 35.1 66.2 35.3Q67.6 35.5 67.7 35.6Q67.8 35.6 68.5 35.6Q69.2 35.6 69.3 35.7Q69.4 35.8 72.4 35.7Q75.4 35.6 75.4 35.6Q75.5 35.5 75.9 35.5Q76.2 35.5 77.9 35.2Q79.5 34.9 80.3 34.6Q81.1 34.2 81.9 34.1Q82.6 33.9 83.9 33.3Q85.2 32.8 87.4 31.4Q89.5 30.0 90.9 28.6Q92.4 27.1 93.1 26.0Q93.9 24.9 94.4 23.8Q94.9 22.8 95.1 21.9Q95.4 21.1 95.4 20.4Q95.5 19.8 95.6 19.7Q95.6 19.6 95.6 19.1Q95.6 18.5 95.7 18.4Q95.8 18.4 95.8 17.6Q95.8 16.9 95.7 16.8Q95.6 16.8 95.6 16.3Q95.6 15.9 95.4 15.0Q95.2 14.1 94.6 12.6Q94.0 11.0 93.0 9.6Q92.0 8.1 90.6 6.8Q89.1 5.4 87.8 4.5Q86.5 3.6 84.4 2.6Q82.2 1.6 79.8 1.0Q77.4 0.4 76.6 0.3Q75.9 0.2 75.8 0.2Q75.8 0.1 74.9 0.1Q74.0 0.1 73.9 0.1Q73.9 0.0 71.4 0.0Q68.9 0.0 68.8 0.1Q68.8 0.1 68.1 0.1Q67.5 0.1 67.4 0.2Q67.4 0.2 66.6 0.3Q65.9 0.4 63.6 0.9Q61.4 1.5 60.2 1.9Q59.1 2.4 57.4 3.2Q55.8 4.1 54.3 5.2Q52.9 6.4 52.0 7.2Q51.1 8.1 50.4 9.1ZM61.3 15.8Q61.6 15.0 61.8 14.7Q62.0 14.4 63.1 13.3Q64.1 12.2 65.6 11.5Q67.0 10.8 68.8 10.4Q70.5 10.0 71.6 10.0Q72.8 10.0 72.8 10.1Q72.9 10.1 73.5 10.2Q74.1 10.2 75.3 10.6Q76.5 10.9 77.2 11.2Q78.0 11.6 78.9 12.2Q79.8 12.9 80.2 13.3Q80.6 13.8 81.0 14.2Q81.4 14.8 81.7 15.4Q82.0 16.1 82.1 16.8Q82.1 17.5 82.2 17.6Q82.2 17.6 82.2 18.4Q82.1 19.1 81.8 20.0Q81.4 20.9 81.1 21.3Q80.8 21.8 80.1 22.4Q79.5 23.0 78.9 23.4Q78.2 23.9 77.5 24.2Q76.8 24.6 75.6 25.0Q74.5 25.4 73.6 25.4Q72.8 25.5 72.7 25.6Q72.6 25.6 71.6 25.6Q70.6 25.6 70.6 25.6Q70.5 25.5 69.6 25.4Q68.8 25.4 68.1 25.2Q67.4 25.0 66.2 24.5Q65.0 24.0 64.3 23.5Q63.6 23.0 62.8 22.1Q62.0 21.2 61.7 20.7Q61.4 20.1 61.1 19.0Q60.9 17.9 60.9 17.2Q61.0 16.5 61.3 15.8Z" fill="currentColor" fill-rule="evenodd"/></svg><span class="tcg">TCG</span></a>
+  <div class="nav-links">
+    <a href="#story">故事</a>
+    <a href="#open">開卡包</a>
+    <a href="#dex" class="dexlink">圖鑑 <span class="count" id="tab-count">0/97</span></a>
+    <a href="#rules">規則</a>
+    <a href="battle.html" class="js-battle">對戰</a>
+    <a href="#market" class="js-market">市場</a>
+    <a href="#open" class="cta">開一包</a>
+  </div>
+</nav>
+<section id="story" class="story" aria-label="NOXCAT TCG 介紹">
+  <div class="story-sticky">
+    <canvas id="story-gl" aria-hidden="true"></canvas>
+    <div class="scene" data-in="0" data-out="0.17">
+      <div class="ghost" aria-hidden="true">NOXCAT</div>
+      <div class="sharp">
+        <span class="pill">NOXCAT TCG · 第三彈「覺醒之戰」上市</span>
+        <h1>認識 NOXCAT。</h1>
+        <p>97 張卡，三彈卡包加上 8 張基本資源。每包 5 張，撕開就知道今天遇見誰，收齊了還能組牌對戰。</p>
+      </div>
+    </div>
+    <div class="scene" data-in="0.18" data-out="0.4">
+      <div class="ghost" aria-hidden="true">97 張卡</div>
+      <div class="sharp left">
+        <span class="pill">CYBERCAT COLLECTION</span>
+        <h2>每一隻，都是不同的自己。</h2>
+        <p>第一彈「NOXCAT 集結」的 27 位原版 NOXCAT，從街頭到神話，OG 經典、賽博武士、龍帝、水晶透明都在這裡。</p>
+      </div>
+    </div>
+    <div class="scene" data-in="0.41" data-out="0.62">
+      <div class="ghost" id="tier-ghost" aria-hidden="true">N</div>
+      <div class="sharp left">
+        <span class="pill">六種稀有度</span>
+        <h2><span id="tier-code">N</span> <span id="tier-name">普通</span></h2>
+        <p id="tier-desc"></p>
+        <div class="tier-dots" id="tier-dots" aria-hidden="true"></div>
+      </div>
+    </div>
+    <div class="scene" data-in="0.63" data-out="0.85">
+      <div class="ghost" aria-hidden="true">異色重生</div>
+      <div class="sharp">
+        <span class="pill">第二彈 ALTER EGO</span>
+        <h2>同一群貓，換一種顏色重新登場。</h2>
+        <p>第二彈 23 張異色覺醒，第三彈「覺醒之戰」再加 39 張：大地泰坦、雷霆主宰、指令卡和特殊資源全部登場。</p>
+      </div>
+    </div>
+    <div class="scene" data-in="0.89" data-out="1">
+      <div class="sharp">
+        <span class="pill">準備好了嗎</span>
+        <h2>撕開你的第一包。</h2>
+        <div class="row"><a class="btn btn-primary" href="#open">開始開卡</a><a class="btn btn-ghost" href="#dex">看圖鑑</a></div>
+      </div>
+    </div>
+    <div class="flash" id="flash"></div>
+    <div class="scroll-hint" id="scroll-hint">往下滑</div>
+  </div>
+</section>
+<div class="wrap">
+  
+  <main>
+    <div class="sec-head" id="open"><span class="pill">開卡包</span><h2>撕開一包，看看今天和誰相遇。</h2><p>在舞台上方選第一、二、三彈的卡包。拖曳卡包可以轉動，按住上緣往右滑就能撕開，也可以一次抽五包。</p></div>
+    <section id="view-open" class="open-view">
+      <div class="stage" id="stage">
+        <canvas id="gl" tabindex="0" aria-label="3D 開卡舞台：撕開卡包後點一下翻開卡片"></canvas>
+        <div class="loading" id="loading">正在準備卡包…</div>
+        <div class="hud hud-top" id="hud-pack-top">
+          <div class="covers" role="group" aria-label="選擇卡包封面" id="covers"></div>
+        </div>
+        <div class="hud hud-top" id="hud-reveal" hidden>
+          <p class="callout" id="callout"></p>
+          <div class="row"><span class="counter" id="counter">1 / 5</span><span class="note" id="reveal-tip">點一下翻開</span><button type="button" class="btn btn-ghost btn-small" id="btn-skip">全部翻開</button></div>
+        </div>
+        <div class="hud hud-top" id="hud-summary-top" hidden>
+          <p class="sum-title" id="sum-title"></p>
+          <p class="note">點卡片可以放大看</p>
+        </div>
+        <div class="hud hud-bottom" id="hud-pack">
+          <p class="note">按住卡包<b>上緣往右滑</b>撕開，拖曳其他地方可以轉動卡包</p>
+          <div class="row"><button type="button" class="btn btn-primary" id="btn-tear">直接撕開 <span class="price-tag">$5</span></button><button type="button" class="btn btn-ghost js-five">抽五包 <span class="price-tag">$25</span></button></div>
+          <div class="stats"><span>餘額 <b class="js-bal">—</b></span><span>已開 <b id="st-packs">0</b> 包</span><span>收集 <b id="st-owned">0</b>/97</span></div>
+        </div>
+        <div class="hud hud-bottom" id="hud-summary" hidden>
+          <div class="row">
+            <button type="button" class="btn btn-primary" id="btn-again">再開一包</button>
+            <button type="button" class="btn btn-ghost js-five">抽五包 <span class="price-tag">$25</span></button>
+            <button type="button" class="btn btn-ghost" id="btn-to-dex">查看圖鑑</button>
+          </div>
+        </div>
+      </div>
+
+      <aside class="side">
+        <div class="side-intro">
+          <h2>三彈的秘藏卡</h2>
+          <p>每彈各有一張秘藏卡，每包約 1.1%。究極稀有以上約 5.9%。</p>
+        </div>
+        <div class="chase" id="chase"></div>
+        <div class="tiers" id="tier-list"><h3>六種稀有度</h3></div>
+        <details class="rates">
+          <summary>機率說明</summary>
+          <ul>
+            <li><b>第 1–3 張：</b>N 85%、R 15%</li>
+            <li><b>第 4 張（保底 R 以上）：</b>R 62%、SR 25%、SSR 10%、UR 2.5%、SEC 0.5%</li>
+            <li><b>第 5 張：</b>N 40%、R 30%、SR 18%、SSR 9%、UR 2.4%、SEC 0.6%</li>
+            <li><b>每包至少 1 張：</b>SSR 以上約 23.4%、UR 以上約 5.9%、SEC 約 1.1%</li>
+          </ul>
+          <p>每包 $5，用的是遊戲內的假額度，不涉及任何真實付款或獎品。在 claude.ai 登入時，餘額和收藏跟著你的帳號走。</p>
+        </details>
+      </aside>
+    </section>
+
+    <div class="sec-head" id="dex"><span class="pill">圖鑑</span><h2>你的 NOXCAT 收藏。</h2></div>
+    <section id="view-dex" class="dex-view">
+      <div class="dex-head">
+        <div>
+          <h2>我的圖鑑</h2>
+          <p id="dex-sub"></p>
+          <div class="bar"><i id="dex-bar" style="width:0%"></i></div>
+        </div>
+        <div style="display:grid;gap:10px;justify-items:end">
+          <div class="rar-chips" id="rar-chips"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end"><span class="dex-bal">餘額 <b class="js-bal">—</b></span><a class="btn btn-primary btn-small js-market" href="#market">到市場買賣卡片</a></div>
+          <button type="button" class="btn btn-ghost btn-small" id="btn-reset" hidden>清空收藏</button>
+        </div>
+      </div>
+      <div class="dex-grid" id="dex-grid"></div>
+    </section>
+
+    <div class="sec-head" id="rules"><span class="pill">玩法規則</span><h2>40 張牌，先拿完 4 張戰利品的人贏。</h2><p>兩個人各帶一副 40 張的牌組對戰。派 NOXCAT 上前線，貼資源、用招式把對手的 NOXCAT 擊倒，每擊倒一隻就拿一張戰利品。</p><a class="btn btn-primary js-battle" href="battle.html">用抽到的卡跟電腦對戰</a></div>
+    <section class="rules" aria-label="遊戲規則">
+      <article class="rule-card">
+        <h3>怎樣算贏</h3>
+        <ol>
+          <li>先把自己的 4 張戰利品全部拿完。</li>
+          <li>對手場上已經沒有任何 NOXCAT。</li>
+          <li>對手回合開始要抽牌時，牌庫已經沒有牌。</li>
+        </ol>
+      </article>
+      <article class="rule-card">
+        <h3>組一副牌</h3>
+        <ul>
+          <li>牌組剛好 <b>40 張</b>，同名的卡最多 3 張；基本資源不限張數。</li>
+          <li>建議比例：NOXCAT 14 張、指令卡 14 張、資源卡 12 張。</li>
+          <li>至少要有 1 張基礎 NOXCAT，不然沒辦法開局。</li>
+        </ul>
+      </article>
+      <article class="rule-card">
+        <h3>三種卡</h3>
+        <dl>
+          <dt>NOXCAT 卡</dt><dd>上場戰鬥的角色。分成基礎、一階覺醒、二階覺醒；標有「傳奇」的被擊倒時，對手拿 2 張戰利品。</dd>
+          <dt>指令卡</dt><dd>夥伴卡每回合限 1 張；道具卡不限張數；裝備卡裝在 NOXCAT 身上；場地卡雙方都適用，新的會蓋掉舊的。</dd>
+          <dt>資源卡</dt><dd>貼在 NOXCAT 身上，用來支付招式。分成 8 種基本資源和特殊資源。</dd>
+        </dl>
+      </article>
+      <article class="rule-card">
+        <h3>場地配置</h3>
+        <ul>
+          <li><b>前線</b>：1 隻正在戰鬥的 NOXCAT。</li>
+          <li><b>後援區</b>：最多 4 隻待命的 NOXCAT。</li>
+          <li><b>戰利品</b>：開局蓋著放 4 張，擊倒對手時拿 1 張加入手牌。</li>
+          <li><b>牌庫</b>和<b>棄牌區</b>：用過、被擊倒的卡都放進棄牌區。</li>
+        </ul>
+      </article>
+      <article class="rule-card wide">
+        <h3>開局</h3>
+        <ol>
+          <li>洗牌，各抽 7 張。</li>
+          <li>從手牌放 1 隻基礎 NOXCAT 到前線，其他基礎 NOXCAT 可以放到後援區。手上沒有基礎 NOXCAT 就給對手看、洗回去重抽，對手可以多抽 1 張。</li>
+          <li>從牌庫上方拿 4 張蓋著當戰利品。</li>
+          <li>擲硬幣決定先攻。先攻的人第一回合不能用招式，也不能用夥伴卡。</li>
+        </ol>
+      </article>
+      <article class="rule-card wide">
+        <h3>每個回合</h3>
+        <ol>
+          <li><b>抽 1 張牌。</b></li>
+          <li><b>以下動作順序隨意：</b>
+            <ul>
+              <li>放基礎 NOXCAT 到後援區（不限隻數，最多 4 隻）。</li>
+              <li>讓 NOXCAT 覺醒：把覺醒卡疊在對應的 NOXCAT 上。每隻每回合只能升一階，剛上場的那回合和你的第一回合不能覺醒。</li>
+              <li>從手牌貼 1 張資源到你的任一隻 NOXCAT（每回合 1 次）。</li>
+              <li>使用指令卡：道具不限、夥伴 1 張、場地 1 張。</li>
+              <li>撤離：付撤離成本（棄掉身上的資源），把前線換成後援區的 NOXCAT，每回合 1 次。</li>
+              <li>使用「特性」。</li>
+            </ul>
+          </li>
+          <li><b>用招式攻擊。</b>身上的資源符合招式需求就能使用。攻擊完回合就結束；不攻擊也可以直接結束回合。</li>
+        </ol>
+      </article>
+      <article class="rule-card">
+        <h3>傷害怎麼算</h3>
+        <ul>
+          <li>招式傷害打在對手的前線 NOXCAT 上，每 10 點放 1 個傷痕。</li>
+          <li>被自己的弱點屬性打到：<b>傷害 ×2</b>（卡面的「剋制」）。</li>
+          <li>被自己抵抗的屬性打到：<b>傷害 −30</b>（只有一階覺醒以上和傳奇有）。</li>
+          <li>傷痕達到 NP 就被擊倒，進棄牌區。攻擊方拿 1 張戰利品（傳奇 2 張），被擊倒的一方從後援區補上前線。</li>
+          <li>對手後援區受到的傷害，不計剋制和抵抗。</li>
+        </ul>
+      </article>
+      <article class="rule-card">
+        <h3>異常狀態</h3>
+        <table>
+          <tbody>
+            <tr><th>毒蝕</th><td>每次回合交換時，受到 10 傷害。</td></tr>
+            <tr><th>灼燒</th><td>每次回合交換時，受到 20 傷害，然後擲硬幣，正面就解除。</td></tr>
+            <tr><th>沉睡</th><td>不能攻擊和撤離。回合交換時擲硬幣，正面就醒來。</td></tr>
+            <tr><th>癱瘓</th><td>下一個自己的回合不能攻擊和撤離，之後自動解除。</td></tr>
+            <tr><th>錯亂</th><td>攻擊前擲硬幣，反面就攻擊失敗，自己受到 30 傷害。</td></tr>
+          </tbody>
+        </table>
+        <p class="rule-note">撤離到後援區或覺醒，都會解除所有異常狀態。</p>
+      </article>
+      <article class="rule-card wide">
+        <h3>屬性剋制</h3>
+        <div class="type-table" id="type-table"></div>
+        <p class="rule-note">五行循環：火焰 → 草木 → 大地 → 雷電 → 水流 → 火焰；另一組：暗黑 → 金屬 → 幻惑 → 暗黑。箭頭前面的屬性打箭頭後面的，傷害 ×2。</p>
+      </article>
+    </section>
+  </main>
+  <footer class="site-foot"><span>NOXCAT TCG · 第一彈「NOXCAT 集結」· 第二彈「異色重生」· 第三彈「覺醒之戰」</span><span>展示用頁面，不涉及任何付款或真實獎品。</span></footer>
+</div>
+
+<div class="multi" id="multi" hidden role="dialog" aria-modal="true" aria-labelledby="multi-title">
+  <div class="multi-inner">
+    <div class="multi-head">
+      <div>
+        <span class="pill" id="multi-pill">五連抽</span>
+        <h2 id="multi-title">洗牌中…</h2>
+        <p class="multi-sub" id="multi-sub"></p>
+      </div>
+      <div class="multi-chips" id="multi-chips"></div>
+    </div>
+    <div id="multi-packs" style="display:grid;gap:18px"></div>
+    <div class="multi-foot">
+      <button type="button" class="btn btn-primary" id="multi-again">再抽五包 <span class="price-tag">$25</span></button>
+      <button type="button" class="btn btn-ghost" id="multi-dex">查看圖鑑</button>
+      <button type="button" class="btn btn-ghost" id="multi-close">關閉</button>
+    </div>
+  </div>
+</div>
+
+<div class="battle-ov" id="battle-ov" hidden role="dialog" aria-modal="true" aria-label="NOXCAT 對戰"><iframe id="battle-frame" title="NOXCAT 對戰"></iframe></div>
+
+<div class="modal" id="modal" hidden role="dialog" aria-modal="true" aria-label="卡片放大">
+  <div class="modal-inner">
+    <div class="modal-card" id="modal-card"></div>
+    <p class="modal-tip">移動滑鼠或手指，看看卡面的反光</p>
+    <div class="modal-extra" id="modal-extra"></div>
+    <button type="button" class="btn btn-ghost btn-small" id="modal-close">關閉</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function () {
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const $ = id => document.getElementById(id);
+
+  // ───────── Data ─────────
+  const TYPE = {
+    grass: { n: '草', name: '草木', c: '#7fd858' },
+    fire:  { n: '火', name: '火焰', c: '#ff7b47' },
+    water: { n: '水', name: '水流', c: '#52b9ff' },
+    volt:  { n: '雷', name: '雷電', c: '#ffd23f' },
+    psy:   { n: '幻', name: '幻惑', c: '#c48cff' },
+    earth: { n: '地', name: '大地', c: '#d9a066' },
+    dark:  { n: '暗', name: '暗黑', c: '#8a8fc4' },
+    metal: { n: '金', name: '金屬', c: '#c3cad4' },
+    any:   { n: '通', name: '通用', c: '#eceee4' }
+  };
+  const ATTR = TYPE;
+  const TYPE_ORDER = ['grass', 'fire', 'water', 'volt', 'psy', 'earth', 'dark', 'metal'];
+  const WEAK = { grass: 'fire', fire: 'water', water: 'volt', volt: 'earth', earth: 'grass', dark: 'psy', metal: 'dark', psy: 'metal' };
+  const RESIST = { grass: 'earth', fire: 'grass', water: 'fire', volt: 'water', earth: 'volt', dark: 'metal', metal: 'psy', psy: 'dark' };
+  const TIERS = {
+    N:   { code: 'N',   label: '普通',     sym: '●', rank: 0, col: '#e9eee0', edge: 0x9da394, n: 0 },
+    R:   { code: 'R',   label: '稀有',     sym: '◆', rank: 1, col: '#dfe4ec', edge: 0xc9ced6, n: 0 },
+    SR:  { code: 'SR',  label: '超稀有',   sym: '★', rank: 2, col: '#9fd0ff', edge: 0xe4ecff, n: 0 },
+    SSR: { code: 'SSR', label: '特級稀有', sym: '★', rank: 3, col: '#ffcc45', edge: 0xf5c451, n: 0 },
+    UR:  { code: 'UR',  label: '究極稀有', sym: '✦', rank: 4, col: '#9ef0ff', edge: 0xbfeaff, n: 0, full: true },
+    SEC: { code: 'SEC', label: '秘藏',     sym: '✦', rank: 5, col: '#ff8ae6', edge: 0xffffff, n: 0, full: true },
+    B:   { code: '基本', label: '基本資源', sym: '○', rank: 0, col: '#e9eee0', edge: 0x9da394, n: 0 }
+  };
+  const TIER_ORDER = ['N', 'R', 'SR', 'SSR', 'UR', 'SEC'];
+  const RAINBOW_CSS = 'linear-gradient(90deg,#ff6b6b,#ffe66b,#6bff9d,#6bc8ff,#c77bff)';
+  const CARDS = [
+    {"kind":"cat","name":"OG 經典","tier":"SSR","type":"grass","stage":0,"np":110,"retreat":1,"moves":[{"cost":["grass"],"name":"初代認證","dmg":"20","text":"從牌庫找 1 張基本資源貼到自己身上。"},{"cost":["grass","grass","any"],"name":"NOX 起源","dmg":"70","text":""}],"flavor":"一切從這隻戴著護目鏡的黑貓開始。"},
+    {"kind":"cat","name":"宇航員","tier":"R","type":"metal","stage":0,"np":80,"retreat":2,"moves":[{"cost":["metal","any"],"name":"無重力漫步","dmg":"30","text":"下回合這隻 NOXCAT 受到的傷害 −20。"}],"flavor":"帶了一塊綠色隕石回來，說是月球紀念品。"},
+    {"kind":"cat","name":"金鏈街頭","tier":"N","type":"fire","stage":0,"np":70,"retreat":1,"moves":[{"cost":["fire"],"name":"噴漆塗鴉","dmg":"20","text":""},{"cost":["fire","any"],"name":"金鏈甩擊","dmg":"40","text":""}],"flavor":"整條街的牆，都是牠的畫布。"},
+    {"kind":"cat","name":"雷射眼","tier":"R","type":"volt","stage":0,"np":80,"retreat":1,"moves":[{"cost":["volt","any"],"name":"綠光射線","dmg":"40","text":"擲硬幣，正面多 30 傷害。"}],"flavor":"盯著 K 線太久，眼睛就會發光。"},
+    {"kind":"cat","name":"賽博武士","tier":"R","type":"metal","stage":0,"np":80,"retreat":1,"moves":[{"cost":["metal","any"],"name":"霓虹一閃","dmg":"50","text":"這招不計對手的抵抗。"}],"flavor":"刀是光做的，規矩是自己定的。"},
+    {"kind":"cat","name":"皇冠國王","tier":"SSR","type":"earth","stage":0,"np":110,"retreat":2,"moves":[{"cost":["earth"],"name":"王之權杖","dmg":"","text":"從牌庫找 1 張夥伴卡加入手牌。"},{"cost":["earth","earth","any"],"name":"加冕","dmg":"80","text":""}],"flavor":"綠寶石權杖一舉，整個王國都要排隊。"},
+    {"kind":"cat","name":"禮服紳士","tier":"N","type":"water","stage":0,"np":70,"retreat":1,"moves":[{"cost":["water"],"name":"舉杯致意","dmg":"","text":"回復自己 30 NP。"},{"cost":["water","any"],"name":"冰塊彈","dmg":"30","text":""}],"flavor":"單片眼鏡、領結和一杯綠色特調，禮數不能少。"},
+    {"kind":"cat","name":"電競玩家","tier":"N","type":"volt","stage":0,"np":60,"retreat":1,"moves":[{"cost":["volt"],"name":"連擊","dmg":"10×","text":"擲 3 次硬幣，每次正面 10 傷害。"},{"cost":["volt","any"],"name":"快捷鍵","dmg":"30","text":""}],"flavor":"耳機一戴上，誰叫都聽不到。"},
+    {"kind":"cat","name":"巫師","tier":"R","type":"psy","stage":0,"np":70,"retreat":1,"moves":[{"cost":["psy"],"name":"熬夜研究","dmg":"","text":"抽 2 張卡。"},{"cost":["psy","any"],"name":"綠光法球","dmg":"30","text":""}],"flavor":"法杖上的綠光，是牠熬夜研究出來的。"},
+    {"kind":"cat","name":"黑客","tier":"N","type":"dark","stage":0,"np":70,"retreat":1,"moves":[{"cost":["dark"],"name":"入侵","dmg":"","text":"查看對手的手牌。"},{"cost":["dark","any"],"name":"病毒植入","dmg":"20","text":"對手前線 NOXCAT 陷入毒蝕。"}],"flavor":"一台筆電、一件帽 T，系統就是牠的遊樂場。"},
+    {"kind":"cat","name":"惡魔","tier":"SR","type":"fire","stage":0,"np":90,"retreat":2,"moves":[{"cost":["fire"],"name":"綠焰","dmg":"20","text":"對手前線 NOXCAT 陷入灼燒。"},{"cost":["fire","fire","any"],"name":"惡魔之角","dmg":"70","text":""}],"flavor":"角是真的，火是真的，只有笑容是假的。"},
+    {"kind":"cat","name":"天使","tier":"SR","type":"psy","stage":0,"np":90,"retreat":1,"moves":[{"cost":["psy"],"name":"光之祝福","dmg":"","text":"回復你場上 1 隻 NOXCAT 40 NP。"},{"cost":["psy","any"],"name":"聖光","dmg":"40","text":""}],"flavor":"翅膀很白，眼睛還是那個綠。"},
+    {"kind":"cat","name":"忍者","tier":"N","type":"dark","stage":0,"np":60,"retreat":0,"moves":[{"cost":["dark"],"name":"手裏劍","dmg":"","text":"對手場上 1 隻 NOXCAT 受到 20 傷害（不計剋制和抵抗）。"}],"flavor":"你看到牠的時候，牠已經不在那裡了。"},
+    {"kind":"cat","name":"海盜","tier":"N","type":"water","stage":0,"np":80,"retreat":2,"moves":[{"cost":["water"],"name":"暴風彎刀","dmg":"20","text":""},{"cost":["water","any","any"],"name":"登船","dmg":"50","text":""}],"flavor":"風浪越大，牠笑得越開心。"},
+    {"kind":"cat","name":"殭屍","tier":"N","type":"grass","stage":0,"np":70,"retreat":2,"moves":[{"cost":["grass"],"name":"綠色藥水","dmg":"","text":"回復自己 20 NP。"},{"cost":["grass","any"],"name":"殭屍撲擊","dmg":"30","text":""}],"flavor":"說是喝了提神飲料，結果睡了一百年。"},
+    {"kind":"cat","name":"斗笠俠客","tier":"N","type":"grass","stage":0,"np":70,"retreat":1,"moves":[{"cost":["grass"],"name":"扇風","dmg":"20","text":"對手前線 NOXCAT 下回合不能撤離。"}],"flavor":"一頂斗笠、一把扇子，江湖就是牠的家。"},
+    {"kind":"cat","name":"龍帝","tier":"SSR","type":"fire","stage":0,"np":120,"retreat":2,"moves":[{"cost":["fire","any"],"name":"金龍纏身","dmg":"40","text":"下回合這隻 NOXCAT 受到的傷害 −20。"},{"cost":["fire","fire","any","any"],"name":"龍帝之怒","dmg":"120","text":""}],"flavor":"金龍纏身的那一刻，夜空都亮了。"},
+    {"kind":"cat","name":"鳳凰","tier":"SSR","type":"fire","stage":0,"np":110,"retreat":2,"moves":[{"cost":["fire","any"],"name":"浴火","dmg":"30","text":"回復自己 30 NP。"},{"cost":["fire","fire","any"],"name":"燃盡過去","dmg":"100","text":"棄掉自己身上 1 張資源。"}],"flavor":"燒掉的不是羽毛，是過去。"},
+    {"kind":"cat","name":"雷神","tier":"SR","type":"volt","stage":0,"np":100,"retreat":2,"moves":[{"cost":["volt","any"],"name":"落雷","dmg":"40","text":"擲硬幣，正面對手前線 NOXCAT 陷入癱瘓。"}],"flavor":"牠一生氣，整座城的路燈都會閃。"},
+    {"kind":"cat","name":"仙尊","tier":"SR","type":"psy","stage":0,"np":100,"retreat":2,"moves":[{"cost":["psy","any"],"name":"太極","dmg":"40","text":"下回合這隻 NOXCAT 受到的傷害 −30。"}],"flavor":"修行三百年，鬍子終於白了。"},
+    {"kind":"cat","name":"創始者","tier":"SSR","type":"metal","stage":0,"np":110,"retreat":1,"moves":[{"cost":["metal"],"name":"創世區塊","dmg":"","text":"從牌庫找 1 張基礎 NOXCAT 放到後援區。"},{"cost":["metal","metal","any"],"name":"創始共識","dmg":"70","text":""}],"flavor":"第一個區塊，是牠親手寫下的。"},
+    {"kind":"cat","name":"水晶透明","tier":"UR","type":"water","stage":0,"np":200,"retreat":2,"moves":[{"ability":1,"name":"透明之心","text":"這隻 NOXCAT 不會陷入任何異常狀態。"},{"cost":["water","any"],"name":"折射","dmg":"60","text":"對手後援區 1 隻 NOXCAT 受到 30 傷害。"},{"cost":["water","water","water","any"],"name":"水晶風暴","dmg":"200","text":"下回合這隻 NOXCAT 不能用招式。"}],"flavor":"透明到看得見心跳，堅硬到砍不出裂痕。","legend":1},
+    {"kind":"cat","name":"純金","tier":"UR","type":"metal","stage":0,"np":200,"retreat":3,"moves":[{"ability":1,"name":"全身 24K","text":"這隻 NOXCAT 不會因為剋制受到加倍傷害。"},{"cost":["metal","metal","any","any"],"name":"黃金重擊","dmg":"180","text":""}],"flavor":"全身 24K，連鬍鬚都會反光。","legend":1},
+    {"kind":"cat","name":"外星人","tier":"SR","type":"psy","stage":0,"np":90,"retreat":1,"moves":[{"cost":["psy"],"name":"未知訊號","dmg":"","text":"對手前線 NOXCAT 陷入錯亂。"},{"cost":["psy","any","any"],"name":"光波探測","dmg":"50","text":""}],"flavor":"牠說牠來自很遠的鏈，沒人聽得懂那串地址。"},
+    {"kind":"cat","name":"機械體","tier":"R","type":"metal","stage":0,"np":80,"retreat":2,"moves":[{"cost":["metal"],"name":"綠能核心","dmg":"","text":"從棄牌區把 1 張基本資源貼到自己身上。"},{"cost":["metal","metal","any"],"name":"機械拳","dmg":"60","text":""}],"flavor":"一半是貓，一半是程式碼，兩邊都很可愛。"},
+    {"kind":"cat","name":"殭屍腦","tier":"R","type":"grass","stage":0,"np":90,"retreat":2,"moves":[{"cost":["grass","any"],"name":"想太多","dmg":"30×","text":"擲 2 次硬幣，每次正面 30 傷害。"},{"cost":["grass","grass","any"],"name":"腦波干擾","dmg":"60","text":"對手前線 NOXCAT 陷入錯亂。"}],"flavor":"想太多的結果，大家都看得到。"},
+    {"kind":"cat","name":"彩虹全息","tier":"SEC","type":"psy","stage":0,"np":210,"retreat":2,"moves":[{"cost":["psy","any"],"name":"全息投影","dmg":"60","text":"擲硬幣，正面下回合對手的招式對這隻 NOXCAT 無效。"},{"cost":["psy","psy","psy","any","any"],"name":"七彩終焉","dmg":"250","text":""}],"flavor":"每轉一個角度，牠就換一種顏色。","legend":1},
+    {"kind":"cat","name":"像素忍者","tier":"N","type":"dark","stage":1,"np":100,"retreat":0,"moves":[{"cost":["dark","any"],"name":"影分身","dmg":"30","text":"擲硬幣，正面下回合這隻 NOXCAT 不會受到招式傷害。"},{"cost":["dark","dark","any"],"name":"像素斬","dmg":"80","text":""}],"flavor":"從老遊戲機裡跑出來的忍者，跳起來還有音效。","from":"忍者"},
+    {"kind":"cat","name":"像素電競","tier":"N","type":"volt","stage":1,"np":100,"retreat":1,"moves":[{"cost":["volt","any"],"name":"連打","dmg":"20×","text":"擲 4 次硬幣，每次正面 20 傷害。"},{"cost":["volt","volt","any"],"name":"連段終結","dmg":"80","text":""}],"flavor":"按鍵聲比背景音樂還大聲。","from":"電競玩家"},
+    {"kind":"cat","name":"網點海盜","tier":"N","type":"water","stage":1,"np":110,"retreat":2,"moves":[{"cost":["water","any"],"name":"連載衝擊","dmg":"50","text":""},{"cost":["water","water","any"],"name":"黑旗掠奪","dmg":"80","text":"棄掉對手前線 NOXCAT 身上 1 張資源。"}],"flavor":"從週刊連載裡跳出來的船長。","from":"海盜"},
+    {"kind":"cat","name":"網點街頭","tier":"N","type":"fire","stage":1,"np":110,"retreat":1,"moves":[{"cost":["fire","any"],"name":"網點噴射","dmg":"50","text":"對手前線 NOXCAT 陷入灼燒。"},{"cost":["fire","fire","any"],"name":"街頭狂潮","dmg":"90","text":""}],"flavor":"每一個點，都是牠親手噴上去的。","from":"金鏈街頭"},
+    {"kind":"cat","name":"夜視黑客","tier":"N","type":"dark","stage":1,"np":110,"retreat":1,"moves":[{"cost":["dark","any"],"name":"關燈","dmg":"30","text":"對手下回合不能使用道具卡。"},{"cost":["dark","dark","any"],"name":"系統癱瘓","dmg":"80","text":"擲硬幣，正面對手前線 NOXCAT 陷入癱瘓。"}],"flavor":"關掉燈，牠反而看得更清楚。","from":"黑客"},
+    {"kind":"cat","name":"墨韻俠客","tier":"N","type":"grass","stage":1,"np":100,"retreat":1,"moves":[{"cost":["grass"],"name":"潑墨","dmg":"","text":"對手後援區 1 隻 NOXCAT 受到 20 傷害。"},{"cost":["grass","grass","any"],"name":"墨韻斬","dmg":"80","text":""}],"flavor":"一滴墨、一把扇，畫完就走。","from":"斗笠俠客"},
+    {"kind":"cat","name":"白夜殭屍","tier":"N","type":"grass","stage":1,"np":110,"retreat":2,"moves":[{"cost":["grass","any"],"name":"白夜甦醒","dmg":"50","text":"擲硬幣，正面讓對手前線 NOXCAT 陷入沉睡。"},{"cost":["grass","grass","any"],"name":"不死之身","dmg":"80","text":"回復自己 30 NP。"}],"flavor":"顏色全反過來之後，連個性都變溫柔了。","from":"殭屍"},
+    {"kind":"cat","name":"霓虹武士","tier":"R","type":"metal","stage":1,"np":110,"retreat":1,"moves":[{"cost":["metal"],"name":"斷訊斬","dmg":"30","text":"棄掉對手前線 NOXCAT 身上的裝備卡。"},{"cost":["metal","metal","any"],"name":"霓虹居合","dmg":"100","text":"這招不計對手的抵抗。"}],"flavor":"訊號越亂，牠的刀越快。","from":"賽博武士"},
+    {"kind":"cat","name":"冰霜宇航員","tier":"R","type":"metal","stage":1,"np":120,"retreat":2,"moves":[{"cost":["metal","any"],"name":"結霜護目鏡","dmg":"40","text":"擲硬幣，正面對手前線 NOXCAT 陷入癱瘓。"},{"cost":["metal","metal","any"],"name":"隕石墜落","dmg":"100","text":""}],"flavor":"在太空待太久，連護目鏡都結霜了。","from":"宇航員"},
+    {"kind":"cat","name":"熔岩惡魔","tier":"R","type":"fire","stage":1,"np":120,"retreat":2,"moves":[{"cost":["fire","any"],"name":"冒煙腳步","dmg":"40","text":"對手後援區 1 隻 NOXCAT 受到 20 傷害。"},{"cost":["fire","fire","any"],"name":"熔岩爆發","dmg":"100","text":"棄掉自己身上 1 張火焰資源。"}],"flavor":"牠走過的地方，地板都會冒煙。","from":"惡魔"},
+    {"kind":"cat","name":"霓光巫師","tier":"R","type":"psy","stage":1,"np":100,"retreat":1,"moves":[{"cost":["psy"],"name":"光圈","dmg":"","text":"查看牌庫上方 4 張，選 1 張加入手牌，其餘洗回牌庫。"},{"cost":["psy","psy","any"],"name":"霓光魔彈","dmg":"80","text":""}],"flavor":"只剩一圈綠光，大家還是一眼認出牠。","from":"巫師"},
+    {"kind":"cat","name":"紫外雷射眼","tier":"R","type":"volt","stage":1,"np":110,"retreat":1,"moves":[{"cost":["volt"],"name":"瞄準","dmg":"","text":"對手後援區 1 隻 NOXCAT 受到 20 傷害。"},{"cost":["volt","volt","any"],"name":"紫外光束","dmg":"90","text":""}],"flavor":"換了波長，射得更遠。","from":"雷射眼"},
+    {"kind":"cat","name":"普普紳士","tier":"R","type":"water","stage":1,"np":110,"retreat":1,"moves":[{"cost":["water"],"name":"四杯連飲","dmg":"","text":"回復你場上每隻 NOXCAT 各 20 NP。"},{"cost":["water","water","any"],"name":"普普衝擊","dmg":"80","text":""}],"flavor":"一次舉四杯，四種心情。","from":"禮服紳士"},
+    {"kind":"cat","name":"黑金天使","tier":"SR","type":"psy","stage":1,"np":130,"retreat":1,"moves":[{"cost":["psy","any"],"name":"黃金祝福","dmg":"","text":"回復你場上每隻 NOXCAT 各 30 NP。"},{"cost":["psy","psy","any"],"name":"黑金審判","dmg":"100","text":""}],"flavor":"翅膀鍍了金，祝福也更閃亮了。","from":"天使"},
+    {"kind":"cat","name":"雙生雷神","tier":"SR","type":"volt","stage":1,"np":130,"retreat":2,"moves":[{"cost":["volt","volt"],"name":"平行雷擊","dmg":"50","text":"對手後援區 1 隻 NOXCAT 也受到 30 傷害。"},{"cost":["volt","volt","any"],"name":"雙生雷霆","dmg":"110","text":"自己也受到 20 傷害。"}],"flavor":"一半是今天，一半是另一個平行世界。","from":"雷神"},
+    {"kind":"cat","name":"故障外星人","tier":"SR","type":"psy","stage":1,"np":120,"retreat":1,"moves":[{"cost":["psy","any"],"name":"傳送故障","dmg":"40","text":"對手把前線 NOXCAT 和後援區 1 隻交換（對手選）。"},{"cost":["psy","psy","any"],"name":"錯誤代碼","dmg":"90","text":""}],"flavor":"傳送時出了點錯，但牠覺得這樣比較帥。","from":"外星人"},
+    {"kind":"cat","name":"紫電仙尊","tier":"SR","type":"psy","stage":1,"np":130,"retreat":2,"moves":[{"cost":["psy","psy"],"name":"紫電修為","dmg":"60","text":"擲硬幣，正面對手前線 NOXCAT 陷入沉睡。"},{"cost":["psy","psy","any","any"],"name":"百年一擊","dmg":"130","text":""}],"flavor":"鬍子染紫之後，修為又多了一百年。","from":"仙尊"},
+    {"kind":"cat","name":"血月機械體","tier":"SR","type":"metal","stage":1,"np":130,"retreat":2,"moves":[{"cost":["metal","any"],"name":"核心過熱","dmg":"60","text":"自己也受到 10 傷害。"},{"cost":["metal","metal","any","any"],"name":"血月砲","dmg":"120","text":""}],"flavor":"月亮變紅的那晚，牠的核心也跟著發燙。","from":"機械體"},
+    {"kind":"cat","name":"黑金國王","tier":"SSR","type":"earth","stage":1,"np":140,"retreat":2,"moves":[{"cost":["earth","any"],"name":"夜之王權","dmg":"60","text":"對手後援區每隻 NOXCAT 各受到 10 傷害。"},{"cost":["earth","earth","any","any"],"name":"黑金王國","dmg":"140","text":""}],"flavor":"王冠還是金的，只是王國換成了夜晚。","from":"皇冠國王"},
+    {"kind":"cat","name":"冰龍帝","tier":"SSR","type":"water","stage":1,"np":150,"retreat":2,"moves":[{"cost":["water","any"],"name":"冰封","dmg":"50","text":"擲硬幣，正面對手前線 NOXCAT 陷入癱瘓。"},{"cost":["water","water","any","any"],"name":"冰龍吐息","dmg":"140","text":""}],"flavor":"同一條龍，換了季節就換了脾氣。","from":"龍帝"},
+    {"kind":"cat","name":"闇鳳凰","tier":"SSR","type":"dark","stage":1,"np":150,"retreat":2,"moves":[{"ability":1,"name":"紫灰重生","text":"這隻 NOXCAT 被擊倒時擲硬幣，正面就把它放回手牌，身上的卡全部棄掉。"},{"cost":["dark","dark","any","any"],"name":"闇炎","dmg":"140","text":""}],"flavor":"從紫色的灰燼裡，第二次重生。","from":"鳳凰"},
+    {"kind":"cat","name":"宇宙 OG","tier":"UR","type":"grass","stage":1,"np":240,"retreat":2,"moves":[{"cost":["grass","any"],"name":"星際訊號","dmg":"","text":"從牌庫找 2 張卡加入手牌。"},{"cost":["grass","grass","grass","any"],"name":"宇宙大爆炸","dmg":"220","text":"棄掉自己身上 2 張資源。"}],"flavor":"背景換成整個宇宙，牠還是那隻 OG。","from":"OG 經典","legend":1},
+    {"kind":"cat","name":"全息創始者","tier":"SEC","type":"metal","stage":1,"np":240,"retreat":2,"moves":[{"cost":["metal","any"],"name":"全息區塊","dmg":"60","text":"從牌庫找 2 張卡加入手牌。"},{"cost":["metal","metal","psy","any"],"name":"萬色創世","dmg":"230","text":""}],"flavor":"第一個區塊，被重新寫成了彩虹色。","from":"創始者","legend":1},
+    {"kind":"cat","name":"竹林劍聖","tier":"SSR","type":"grass","stage":2,"np":170,"retreat":2,"moves":[{"cost":["grass","grass"],"name":"葉刃旋風","dmg":"60","text":"對手後援區每隻 NOXCAT 各受到 10 傷害。"},{"cost":["grass","grass","any","any"],"name":"竹林一閃","dmg":"160","text":""}],"flavor":"刀還沒出鞘，竹葉已經落了一地。","from":"墨韻俠客"},
+    {"kind":"cat","name":"煉獄魔王","tier":"SSR","type":"fire","stage":2,"np":180,"retreat":3,"moves":[{"cost":["fire","fire"],"name":"地獄王座","dmg":"60","text":"雙方前線 NOXCAT 都陷入灼燒。"},{"cost":["fire","fire","fire","any"],"name":"煉獄審判","dmg":"180","text":"棄掉自己身上 2 張資源。"}],"flavor":"王座很燙，但牠坐得很舒服。","from":"熔岩惡魔"},
+    {"kind":"cat","name":"深海船長","tier":"SSR","type":"water","stage":2,"np":170,"retreat":3,"moves":[{"cost":["water","water"],"name":"觸手纏繞","dmg":"60","text":"擲硬幣，正面對手前線 NOXCAT 陷入癱瘓。"},{"cost":["water","water","water","any"],"name":"深淵巨浪","dmg":"170","text":""}],"flavor":"沉船是牠的家，章魚是牠的船員。","from":"網點海盜"},
+    {"kind":"cat","name":"雷霆主宰","tier":"UR","type":"volt","stage":2,"np":310,"retreat":3,"moves":[{"cost":["volt","volt"],"name":"雷雲統御","dmg":"","text":"從牌庫找最多 2 張雷電資源，貼到你場上的 NOXCAT 身上。"},{"cost":["volt","volt","volt","any"],"name":"萬雷審判","dmg":"250","text":"棄掉自己身上 2 張資源。"}],"flavor":"雷雲聽牠的，閃電也聽牠的。","from":"雙生雷神","legend":1},
+    {"kind":"cat","name":"大魔導師","tier":"SSR","type":"psy","stage":2,"np":160,"retreat":2,"moves":[{"ability":1,"name":"禁書","text":"每回合一次，可以從牌庫找 1 張指令卡加入手牌。"},{"cost":["psy","psy","any"],"name":"星陣崩落","dmg":"130","text":"對手前線 NOXCAT 陷入錯亂。"}],"flavor":"那本書只有牠翻得開。","from":"霓光巫師"},
+    {"kind":"cat","name":"粉紅甜心","tier":"R","type":"psy","stage":0,"np":70,"retreat":1,"moves":[{"cost":["psy"],"name":"甜心馬卡龍","dmg":"","text":"回復你場上 1 隻 NOXCAT 30 NP。"},{"cost":["psy","any"],"name":"愛心攻勢","dmg":"30","text":"擲硬幣，正面對手前線 NOXCAT 陷入錯亂。"}],"flavor":"馬卡龍只分給喜歡的人。"},
+    {"kind":"cat","name":"影子貓","tier":"N","type":"dark","stage":0,"np":60,"retreat":0,"moves":[{"cost":["dark"],"name":"融入陰影","dmg":"","text":"擲硬幣，正面下回合這隻 NOXCAT 不會受到招式傷害。"},{"cost":["dark","any"],"name":"暗巷偷襲","dmg":"30","text":""}],"flavor":"路燈下有兩個影子，其中一個是牠。"},
+    {"kind":"cat","name":"深淵之影","tier":"SR","type":"dark","stage":1,"np":120,"retreat":1,"moves":[{"cost":["dark","any"],"name":"黑洞吸引","dmg":"","text":"把對手後援區 1 隻 NOXCAT 和對手前線 NOXCAT 交換。"},{"cost":["dark","dark","any"],"name":"深淵吞噬","dmg":"90","text":"回復自己 30 NP。"}],"flavor":"看太久黑洞，黑洞也會看回來。","from":"影子貓"},
+    {"kind":"cat","name":"影之上忍","tier":"SSR","type":"dark","stage":2,"np":160,"retreat":1,"moves":[{"cost":["dark","dark"],"name":"千影手裏劍","dmg":"","text":"對手場上任選 3 隻 NOXCAT，各受到 30 傷害（不計剋制和抵抗）。"},{"cost":["dark","dark","any","any"],"name":"月下暗殺","dmg":"130","text":"如果對手前線 NOXCAT 已經有傷痕，多 50 傷害。"}],"flavor":"月亮底下站著七隻，其中六隻是假的。","from":"像素忍者"},
+    {"kind":"cat","name":"終極機甲","tier":"SSR","type":"metal","stage":2,"np":180,"retreat":3,"moves":[{"ability":1,"name":"機甲裝甲","text":"這隻 NOXCAT 受到的招式傷害 −30。"},{"cost":["metal","metal","metal","any"],"name":"全彈發射","dmg":"180","text":"下回合這隻 NOXCAT 不能用「全彈發射」。"}],"flavor":"駕照考了三次，終於能開最大的那台。","from":"血月機械體"},
+    {"kind":"cat","name":"石像守衛","tier":"N","type":"earth","stage":0,"np":80,"retreat":2,"moves":[{"cost":["earth"],"name":"石盾","dmg":"","text":"下回合這隻 NOXCAT 受到的傷害 −30。"},{"cost":["earth","any","any"],"name":"符文撞擊","dmg":"50","text":""}],"flavor":"守著一座沒人記得的神殿，一守就是一千年。"},
+    {"kind":"cat","name":"遠古石像","tier":"R","type":"earth","stage":1,"np":130,"retreat":3,"moves":[{"cost":["earth","any"],"name":"岩石軌道","dmg":"40","text":"擲硬幣，正面對手前線 NOXCAT 陷入癱瘓。"},{"cost":["earth","earth","any"],"name":"遠古之拳","dmg":"100","text":""}],"flavor":"身上的苔蘚，比牠的年紀還老。","from":"石像守衛"},
+    {"kind":"cat","name":"大地泰坦","tier":"SSR","type":"earth","stage":2,"np":180,"retreat":4,"moves":[{"cost":["earth","earth"],"name":"山脈崩裂","dmg":"80","text":"雙方後援區每隻 NOXCAT 各受到 10 傷害。"},{"cost":["earth","earth","any","any"],"name":"泰坦重踏","dmg":"180","text":""}],"flavor":"牠一伸懶腰，整片山脈就裂開了。","from":"遠古石像"},
+    {"kind":"cat","name":"水晶礦工","tier":"N","type":"earth","stage":0,"np":70,"retreat":1,"moves":[{"cost":["earth"],"name":"挖礦","dmg":"","text":"從牌庫找 1 張大地資源貼到自己身上。"},{"cost":["earth","any"],"name":"十字鎬","dmg":"30","text":""}],"flavor":"挖到綠水晶的那天，牠請全礦坑喝牛奶。"},
+    {"kind":"cat","name":"鑽頭礦工","tier":"R","type":"earth","stage":1,"np":110,"retreat":2,"moves":[{"cost":["earth","any"],"name":"破岩鑽","dmg":"60","text":"這招不計對手的抵抗。"},{"cost":["earth","earth","any"],"name":"鑽穿","dmg":"90","text":"棄掉對手前線 NOXCAT 身上 1 張資源。"}],"flavor":"手換成鑽頭之後，再硬的牆都只是門。","from":"水晶礦工"},
+    {"kind":"cmd","sub":"夥伴","name":"首席研究員","tier":"R","text":"把手牌全部棄掉，然後抽 7 張卡。"},
+    {"kind":"cmd","sub":"夥伴","name":"夜班店長","tier":"R","text":"抽 3 張卡。"},
+    {"kind":"cmd","sub":"夥伴","name":"交易員","tier":"R","text":"雙方把手牌洗回牌庫，各抽 4 張卡。"},
+    {"kind":"cmd","sub":"夥伴","name":"鏈上偵探","tier":"R","text":"從牌庫找 1 張 NOXCAT 卡和 1 張基本資源，給對手看過後加入手牌，然後洗牌。"},
+    {"kind":"cmd","sub":"夥伴","name":"保安隊長","tier":"R","text":"選對手後援區 1 隻 NOXCAT，和對手的前線 NOXCAT 交換。"},
+    {"kind":"cmd","sub":"夥伴","name":"覺醒導師","tier":"SR","text":"從牌庫找 1 張覺醒卡，讓你場上可以覺醒的 NOXCAT 立刻覺醒，然後洗牌。"},
+    {"kind":"cmd","sub":"道具","name":"貓薄荷探測器","tier":"N","text":"從牌庫找 1 張基礎 NOXCAT，給對手看過後加入手牌，然後洗牌。"},
+    {"kind":"cmd","sub":"道具","name":"傳送門","tier":"R","text":"把你的前線 NOXCAT 和後援區 1 隻 NOXCAT 交換，不用付撤離成本。"},
+    {"kind":"cmd","sub":"道具","name":"急救罐頭","tier":"N","text":"回復你場上 1 隻 NOXCAT 30 NP。"},
+    {"kind":"cmd","sub":"道具","name":"九條命","tier":"R","text":"從棄牌區選 1 張 NOXCAT 卡加入手牌。"},
+    {"kind":"cmd","sub":"道具","name":"覺醒糖果","tier":"SR","text":"選你場上 1 隻基礎 NOXCAT，從手牌直接放上它的二階覺醒卡（跳過一階）。不能用在你的第一回合，也不能用在這回合剛放上場的 NOXCAT。"},
+    {"kind":"cmd","sub":"道具","name":"幸運貓爪","tier":"N","text":"擲硬幣，正面抽 2 張卡。"},
+    {"kind":"cmd","sub":"道具","name":"資源補給包","tier":"N","text":"從棄牌區選最多 2 張基本資源加入手牌。"},
+    {"kind":"cmd","sub":"道具","name":"訊號干擾器","tier":"N","text":"擲硬幣，正面棄掉對手前線 NOXCAT 身上 1 張資源。"},
+    {"kind":"cmd","sub":"裝備","name":"綠光護目鏡","tier":"R","text":"裝備的 NOXCAT 對對手前線 NOXCAT 的招式傷害 +20。"},
+    {"kind":"cmd","sub":"裝備","name":"鈦合金背心","tier":"R","text":"裝備的 NOXCAT 受到的招式傷害 −20。"},
+    {"kind":"cmd","sub":"裝備","name":"NOX 吊牌","tier":"R","text":"裝備的 NOXCAT 撤離成本 −1。"},
+    {"kind":"cmd","sub":"場地","name":"夜之城","tier":"SR","text":"雙方的暗黑和雷電 NOXCAT，招式傷害 +10。"},
+    {"kind":"cmd","sub":"場地","name":"翡翠森林","tier":"SR","text":"每回合一次，雙方都可以從手牌多貼 1 張草木資源到草木 NOXCAT 身上。"},
+    {"kind":"cmd","sub":"場地","name":"地下礦坑","tier":"SR","text":"雙方的大地 NOXCAT 撤離成本變成 0。"},
+    {"kind":"energy","name":"雙重資源","tier":"SR","type":"any","text":"算 2 個通用資源。"},
+    {"kind":"energy","name":"彩虹資源","tier":"SEC","type":"any","text":"可以當作任何 1 種屬性的資源。貼上時，這隻 NOXCAT 受到 10 傷害。"},
+    {"kind":"energy","name":"回收資源","tier":"SR","type":"any","text":"算 1 個通用資源。貼著的 NOXCAT 被擊倒時，這張回到手牌。"},
+    {"kind":"energy","name":"護盾資源","tier":"SR","type":"any","text":"算 1 個通用資源。貼著的 NOXCAT 受到的招式傷害 −10。"},
+    {"kind":"energy","basic":1,"name":"基本草木資源","tier":"B","type":"grass","text":"提供 1 個草木資源。"},
+    {"kind":"energy","basic":1,"name":"基本火焰資源","tier":"B","type":"fire","text":"提供 1 個火焰資源。"},
+    {"kind":"energy","basic":1,"name":"基本水流資源","tier":"B","type":"water","text":"提供 1 個水流資源。"},
+    {"kind":"energy","basic":1,"name":"基本雷電資源","tier":"B","type":"volt","text":"提供 1 個雷電資源。"},
+    {"kind":"energy","basic":1,"name":"基本幻惑資源","tier":"B","type":"psy","text":"提供 1 個幻惑資源。"},
+    {"kind":"energy","basic":1,"name":"基本大地資源","tier":"B","type":"earth","text":"提供 1 個大地資源。"},
+    {"kind":"energy","basic":1,"name":"基本暗黑資源","tier":"B","type":"dark","text":"提供 1 個暗黑資源。"},
+    {"kind":"energy","basic":1,"name":"基本金屬資源","tier":"B","type":"metal","text":"提供 1 個金屬資源。"}
+  ];
+  const SETS = {
+    1: { label: '第一彈', name: 'NOXCAT 集結', en: 'CYBERCAT COLLECTION', total: 0 },
+    2: { label: '第二彈', name: '異色重生', en: 'ALTER EGO', total: 0 },
+    3: { label: '第三彈', name: '覺醒之戰', en: 'AWAKENING', total: 0 },
+    0: { label: '基本資源', name: '基本資源', en: 'BASIC RESOURCES', total: 0 }
+  };
+  const SET_ORDER = [1, 2, 3];
+  CARDS.forEach((c, i) => {
+    c.id = i + 1; c.no = String(c.id).padStart(3, '0');
+    c.set = c.id <= 27 ? 1 : c.id <= 50 ? 2 : c.id <= 89 ? 3 : 0;
+    c.attr = c.type || 'any'; c.flavor = c.flavor || ''; c.moves = c.moves || [];
+    SETS[c.set].total++; c.sn = String(SETS[c.set].total).padStart(3, '0');
+  });
+  const ALL = CARDS.length;
+  TIER_ORDER.concat('B').forEach(k => { TIERS[k].n = CARDS.filter(c => c.tier === k).length; });
+  const tierCount = (set, k) => CARDS.filter(c => c.set === set && c.tier === k).length;
+  const POOL = {}; SET_ORDER.forEach(st => { POOL[st] = {}; TIER_ORDER.forEach(t => POOL[st][t] = []); });
+  CARDS.forEach(c => { if (c.set) POOL[c.set][c.tier].push(c); });
+  const PACKS = [
+    { id: 'og', set: 1, label: 'OG 經典', art: 1, accent: '#b4f01e', glow: 'rgba(180,240,30,.6)', ed: 'OG EDITION' },
+    { id: 'king', set: 1, label: '皇冠國王', art: 6, accent: '#f5c451', glow: 'rgba(245,196,81,.6)', ed: 'ROYAL EDITION' },
+    { id: 'holo', set: 1, label: '彩虹全息', art: 27, accent: '#ff8ae6', glow: 'rgba(255,138,230,.55)', ed: 'HOLO EDITION', rainbow: true },
+    { id: 'ice', set: 2, label: '冰龍帝', art: 47, accent: '#6fd8ff', glow: 'rgba(111,216,255,.6)', ed: 'ICE EDITION' },
+    { id: 'glitch', set: 2, label: '霓虹武士', art: 35, accent: '#ff3ea5', glow: 'rgba(255,62,165,.55)', ed: 'GLITCH EDITION' },
+    { id: 'titan', set: 3, label: '大地泰坦', art: 63, accent: '#e0a868', glow: 'rgba(224,168,104,.6)', ed: 'TITAN EDITION' },
+    { id: 'thunder', set: 3, label: '雷霆主宰', art: 54, accent: '#ffd23f', glow: 'rgba(255,210,63,.6)', ed: 'THUNDER EDITION' }
+  ];
+
+  // ───────── Storage (this browser only) ─────────
+  const KEY = 'noxcat-tcg-cybercat-1';
+  function load() {
+    try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && typeof s === 'object' && s.owned && typeof s.packs === 'number') return s; } catch (e) {}
+    return { owned: {}, packs: 0, cover: 'og' };
+  }
+  function saveLocal() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+  // the account module (market.js) mirrors this state to the signed-in account and keeps the balance
+  function save() { saveLocal(); if (window.NOXACCT) window.NOXACCT.persist(); }
+  let S = load();
+  if (!PACKS.some(p => p.id === S.cover)) S.cover = 'og';
+
+  // ───────── Art + canvas helpers ─────────
+  const artCache = {};
+  function loadArt(n) {
+    if (!artCache[n]) artCache[n] = new Promise(res => {
+      const img = new Image();
+      img.onload = () => res(img); img.onerror = () => res(null);
+      img.src = `art/${String(n).padStart(2, '0')}.jpg`;
+    });
+    return artCache[n];
+  }
+  const FB = '"Noto Sans TC","PingFang TC","Microsoft JhengHei","Heiti TC",sans-serif';
+  const FM = 'Unbounded,"Arial Black","Noto Sans TC",sans-serif';
+  const LOGO = {"cat": "M3.9 14.8Q3.4 15.2 2.8 17.3Q2.2 19.4 2.2 22.2Q2.2 25.1 3.4 33.6Q4.6 42.0 3.4 45.7Q2.1 49.4 1.3 53.2Q0.5 57.1 0.2 59.4Q0.0 61.6 0.1 66.8Q0.2 71.9 0.7 74.8Q1.1 77.8 2.1 81.1Q3.1 84.5 4.9 87.7Q6.8 90.9 8.3 92.3Q9.9 93.8 12.0 94.8Q14.1 95.9 16.4 96.2Q18.6 96.6 51.5 96.6Q84.4 96.6 86.7 96.2Q89.0 95.8 91.1 94.9Q93.2 94.0 94.9 92.9Q96.5 91.8 98.1 90.2Q99.6 88.6 101.3 85.8Q103.0 83.0 104.1 79.8Q105.1 76.6 105.7 72.8Q106.2 68.9 106.1 63.2Q105.9 57.5 105.1 54.2Q104.2 51.0 102.4 47.0Q100.6 43.0 97.9 39.5Q95.2 36.0 92.6 33.6Q90.0 31.2 86.5 28.9Q83.0 26.6 80.2 25.2Q77.5 23.9 73.5 22.4Q69.5 21.0 65.5 20.0Q61.5 19.0 58.1 14.1Q54.6 9.1 53.1 7.2Q51.5 5.4 49.2 3.3Q47.0 1.2 45.6 0.6Q44.2 0.0 43.3 0.0Q42.4 0.0 41.7 0.3Q41.0 0.6 39.9 2.1Q38.8 3.5 37.8 6.4Q36.9 9.2 36.3 13.8Q35.8 18.2 35.2 18.8Q34.8 19.4 29.1 21.0Q23.5 22.6 19.0 19.8Q14.5 16.9 12.6 15.9Q10.6 15.0 8.2 14.5Q5.8 14.0 5.1 14.2Q4.4 14.4 3.9 14.8Z", "eyes": "M14.8 41.4Q15.9 40.4 16.9 40.3Q18.0 40.2 19.2 40.9Q20.5 41.5 21.8 42.9Q23.0 44.4 23.9 46.3Q24.8 48.2 25.1 49.9Q25.5 51.6 25.4 53.7Q25.4 55.8 24.8 57.2Q24.1 58.6 23.1 59.3Q22.1 60.0 21.0 59.9Q19.9 59.9 18.8 59.2Q17.8 58.6 16.4 56.9Q15.0 55.1 14.3 53.5Q13.6 51.9 13.2 50.4Q12.9 48.9 12.9 47.0Q12.9 45.1 13.3 43.8Q13.8 42.4 14.8 41.4ZM35.9 33.5Q36.9 32.9 37.9 32.9Q38.9 32.9 39.9 33.4Q41.0 34.0 42.1 35.1Q43.1 36.2 44.2 38.3Q45.2 40.4 45.7 42.1Q46.1 43.8 46.1 45.9Q46.1 48.0 45.6 49.4Q45.1 50.8 44.1 51.6Q43.0 52.5 42.0 52.6Q41.0 52.6 39.8 52.0Q38.5 51.4 37.2 49.8Q35.9 48.2 35.0 46.2Q34.1 44.2 33.8 42.8Q33.5 41.2 33.6 38.9Q33.8 36.5 34.4 35.3Q35.0 34.1 35.9 33.5Z", "cw": 106.25, "ch": 96.62, "word": "M228.8 2.2Q228.5 2.8 228.5 6.6Q228.5 10.5 228.6 10.7Q228.6 10.9 228.8 11.1Q229.0 11.2 229.6 11.4Q230.1 11.6 235.7 11.6Q241.2 11.6 241.3 11.6Q241.4 11.5 241.8 11.5Q242.2 11.5 242.3 11.6Q242.4 11.6 242.8 11.6Q243.1 11.6 243.5 11.9Q243.9 12.1 244.0 12.4Q244.1 12.8 244.1 13.4Q244.1 14.0 244.1 14.1Q244.0 14.1 244.0 14.7Q244.0 15.2 244.1 15.3Q244.1 15.4 244.1 15.8Q244.1 16.1 244.1 16.2Q244.0 16.2 244.0 24.2Q244.0 32.2 244.2 32.9Q244.4 33.6 244.6 33.8Q244.8 34.0 245.1 34.1Q245.4 34.2 245.8 34.2Q246.1 34.2 246.2 34.2Q246.2 34.1 246.9 34.1Q247.6 34.1 247.7 34.2Q247.8 34.2 251.6 34.2Q255.5 34.2 255.6 34.2Q255.6 34.1 256.0 34.1Q256.4 34.1 256.6 33.9Q256.9 33.8 257.1 33.2Q257.2 32.8 257.2 22.7Q257.2 12.6 257.3 12.4Q257.4 12.2 257.6 12.0Q257.9 11.8 258.1 11.7Q258.2 11.6 260.4 11.6Q262.6 11.6 262.7 11.6Q262.8 11.5 262.9 11.6Q263.0 11.6 267.1 11.6Q271.2 11.6 271.8 11.4Q272.4 11.2 272.6 10.7Q272.9 10.1 272.9 6.6Q272.9 3.1 272.7 2.6Q272.5 2.0 272.3 1.8Q272.1 1.6 271.8 1.5Q271.4 1.4 250.7 1.4Q230.0 1.4 229.6 1.6Q229.1 1.8 228.8 2.2ZM183.0 30.3Q182.0 32.4 182.0 32.9Q182.0 33.5 182.1 33.7Q182.2 33.9 182.8 34.1Q183.2 34.2 184.3 34.2Q185.4 34.2 185.4 34.2Q185.5 34.1 186.1 34.1Q186.6 34.1 186.7 34.2Q186.8 34.2 187.4 34.2Q188.0 34.2 188.1 34.2Q188.1 34.1 190.8 34.2Q193.5 34.2 194.1 34.1Q194.8 33.9 195.1 33.6Q195.4 33.2 196.2 31.1Q197.1 29.0 197.6 28.6Q198.0 28.1 198.6 28.0Q199.2 27.9 205.4 27.9Q211.6 27.9 212.2 28.0Q212.9 28.1 213.3 28.5Q213.8 28.9 214.7 31.1Q215.6 33.2 215.9 33.6Q216.2 33.9 216.5 34.0Q216.8 34.1 220.8 34.1Q224.9 34.1 224.9 34.2Q225.0 34.2 225.9 34.2Q226.9 34.2 226.9 34.2Q227.0 34.1 227.8 34.1Q228.5 34.0 228.8 33.8Q229.0 33.5 228.9 32.8Q228.9 32.0 228.4 31.2Q228.0 30.4 226.5 26.9Q225.0 23.5 223.8 20.9Q222.5 18.4 222.4 17.9Q222.2 17.5 220.6 13.9Q218.9 10.2 218.7 9.6Q218.5 9.0 218.0 8.1Q217.5 7.1 216.6 4.9Q215.6 2.6 215.2 2.2Q214.9 1.9 214.3 1.6Q213.8 1.4 212.8 1.4Q211.9 1.4 211.8 1.4Q211.8 1.5 211.4 1.4Q211.1 1.4 204.2 1.4Q197.4 1.4 196.9 1.5Q196.5 1.6 196.2 1.8Q195.9 2.0 195.5 2.6Q195.1 3.2 194.4 5.1Q193.6 6.9 193.0 8.1Q192.4 9.2 192.3 9.6Q192.2 9.9 191.8 10.8Q191.2 11.8 190.9 12.6Q190.6 13.5 190.0 14.7Q189.4 15.9 189.2 16.4Q189.0 17.0 187.6 20.1Q186.1 23.1 186.0 23.6Q185.9 24.0 185.1 25.5Q184.4 27.0 184.2 27.6Q184.0 28.2 183.0 30.3ZM204.9 10.6Q205.4 10.1 205.5 10.1Q205.6 10.1 205.9 10.3Q206.1 10.5 208.1 14.7Q210.0 18.9 210.1 19.3Q210.1 19.8 209.8 20.1Q209.5 20.4 209.3 20.4Q209.1 20.5 208.4 20.5Q207.6 20.5 207.6 20.4Q207.5 20.4 207.1 20.4Q206.8 20.4 206.7 20.4Q206.6 20.5 204.2 20.5Q201.9 20.5 201.6 20.4Q201.4 20.2 201.2 20.0Q201.0 19.8 201.1 19.2Q201.1 18.6 202.8 14.9Q204.5 11.2 204.5 11.1Q204.5 11.0 204.9 10.6ZM94.5 1.8Q94.2 2.0 94.2 2.3Q94.2 2.6 94.8 3.4Q95.4 4.2 100.2 9.5Q105.1 14.8 105.9 15.7Q106.8 16.6 106.9 16.9Q107.0 17.2 106.9 17.6Q106.9 18.0 106.6 18.4Q106.4 18.8 105.3 19.9Q104.2 21.0 100.7 25.2Q97.1 29.5 95.9 30.8Q94.6 32.1 94.4 32.6Q94.1 33.0 94.1 33.2Q94.1 33.5 94.2 33.7Q94.4 33.9 94.9 34.1Q95.5 34.2 96.3 34.2Q97.1 34.2 97.2 34.2Q97.2 34.1 98.1 34.1Q98.9 34.1 98.9 34.2Q99.0 34.2 99.4 34.2Q99.9 34.2 99.9 34.2Q100.0 34.1 100.9 34.1Q101.9 34.1 101.9 34.2Q102.0 34.2 104.4 34.2Q106.8 34.1 106.8 34.2Q106.9 34.2 107.2 34.2Q107.5 34.2 107.9 34.1Q108.4 34.0 108.7 33.8Q109.0 33.6 109.4 33.2Q109.8 32.9 111.9 30.1Q114.1 27.2 114.4 26.9Q114.8 26.6 115.0 26.5Q115.2 26.4 115.6 26.4Q115.9 26.5 116.3 26.9Q116.8 27.4 117.8 28.8Q118.9 30.2 119.5 30.9Q120.1 31.6 120.4 32.1Q120.8 32.6 121.3 33.2Q121.9 33.8 122.3 33.9Q122.8 34.1 124.1 34.1Q125.4 34.1 125.4 34.2Q125.5 34.2 126.5 34.2Q127.5 34.2 127.6 34.2Q127.6 34.1 130.6 34.2Q133.6 34.2 133.7 34.2Q133.8 34.1 134.8 34.1Q135.9 34.1 136.2 33.9Q136.5 33.6 136.6 33.4Q136.6 33.2 136.6 33.1Q136.5 32.9 135.9 32.1Q135.4 31.2 133.5 29.2Q131.6 27.1 131.4 26.8Q131.1 26.4 129.1 24.0Q127.0 21.6 126.4 21.0Q125.8 20.4 124.8 19.2Q123.9 18.0 123.9 17.5Q123.9 17.0 124.1 16.6Q124.2 16.2 130.1 10.0Q135.9 3.8 136.2 3.3Q136.5 2.9 136.6 2.6Q136.6 2.4 136.6 2.1Q136.5 1.9 136.4 1.8Q136.2 1.6 135.9 1.5Q135.5 1.4 129.4 1.4Q123.2 1.4 122.8 1.5Q122.4 1.6 122.0 1.9Q121.6 2.1 121.2 2.6Q120.8 3.0 118.9 5.2Q117.1 7.5 116.5 8.1Q115.9 8.8 115.7 8.8Q115.5 8.9 115.1 8.8Q114.8 8.6 113.2 6.9Q111.8 5.2 110.8 4.1Q109.9 2.9 109.4 2.4Q109.0 2.0 108.5 1.8Q108.0 1.5 107.8 1.4Q107.5 1.4 101.3 1.4Q95.1 1.4 94.9 1.4Q94.8 1.5 94.5 1.8ZM0.6 1.8Q0.4 2.0 0.2 2.3Q0.1 2.6 0.1 14.7Q0.1 26.8 0.1 26.8Q0.0 26.9 0.0 27.2Q0.0 27.6 0.1 27.7Q0.1 27.8 0.1 30.4Q0.1 33.1 0.3 33.5Q0.5 33.9 0.7 34.0Q0.9 34.1 1.2 34.2Q1.5 34.2 4.2 34.2Q7.0 34.2 7.1 34.2Q7.1 34.1 8.2 34.1Q9.2 34.1 9.3 34.2Q9.4 34.2 10.5 34.2Q11.6 34.1 11.7 34.2Q11.8 34.2 12.1 34.2Q12.4 34.2 12.8 34.1Q13.1 33.9 13.2 33.7Q13.4 33.5 13.5 33.0Q13.6 32.5 13.6 24.7Q13.6 16.9 13.6 16.8Q13.5 16.8 13.5 16.1Q13.5 15.5 13.6 15.4Q13.6 15.4 13.6 15.0Q13.6 14.6 13.8 14.4Q14.0 14.1 14.2 14.2Q14.4 14.2 14.7 14.6Q15.0 15.0 17.2 19.4Q19.5 23.8 19.5 23.9Q19.5 24.0 20.4 25.8Q21.4 27.6 21.4 27.9Q21.5 28.1 21.6 28.2Q21.8 28.4 22.9 30.8Q24.1 33.1 24.4 33.4Q24.8 33.8 25.2 33.9Q25.6 34.1 26.0 34.1Q26.4 34.1 26.4 34.2Q26.5 34.2 27.4 34.2Q28.4 34.2 28.4 34.2Q28.5 34.1 29.4 34.1Q30.2 34.1 30.3 34.2Q30.4 34.2 34.8 34.2Q39.1 34.2 39.2 34.2Q39.2 34.1 40.8 34.1Q42.4 34.1 42.8 33.9Q43.1 33.6 43.2 33.4Q43.4 33.1 43.4 31.7Q43.4 30.2 43.4 30.2Q43.5 30.1 43.4 29.9Q43.4 29.6 43.4 29.2Q43.4 28.9 43.4 28.8Q43.5 28.8 43.5 16.1Q43.5 3.4 43.4 3.3Q43.4 3.2 43.4 2.9Q43.4 2.6 43.0 2.1Q42.6 1.6 42.2 1.5Q41.8 1.4 36.6 1.4Q31.4 1.4 31.2 1.4Q31.0 1.5 30.8 1.8Q30.5 2.0 30.4 2.4Q30.2 2.9 30.2 12.0Q30.2 21.1 30.2 21.2Q30.1 21.2 30.1 21.6Q30.1 21.9 29.9 22.1Q29.8 22.4 29.4 22.1Q29.1 21.9 28.4 20.3Q27.6 18.8 27.4 18.2Q27.2 17.6 26.8 16.9Q26.4 16.1 26.0 15.2Q25.6 14.2 24.2 11.4Q22.8 8.6 22.5 7.9Q22.2 7.2 22.0 6.9Q21.8 6.5 20.8 4.5Q19.9 2.5 19.5 2.1Q19.1 1.8 18.6 1.6Q18.0 1.4 9.7 1.4Q1.4 1.4 1.1 1.4Q0.9 1.5 0.6 1.8ZM138.4 9.2Q137.8 10.1 137.2 11.1Q136.8 12.1 136.3 13.3Q135.9 14.5 135.8 15.2Q135.8 16.0 135.7 16.1Q135.6 16.1 135.6 16.7Q135.6 17.2 135.6 17.3Q135.5 17.4 135.6 19.0Q135.8 20.6 136.3 22.2Q136.9 23.9 137.4 24.8Q137.9 25.6 138.5 26.5Q139.1 27.4 140.2 28.5Q141.4 29.6 142.9 30.8Q144.5 31.9 146.4 32.8Q148.4 33.8 150.3 34.4Q152.2 35.0 152.9 35.1Q153.5 35.1 154.2 35.3Q155.0 35.5 155.4 35.5Q155.8 35.5 155.8 35.6Q155.9 35.6 159.1 35.7Q162.2 35.8 162.3 35.7Q162.4 35.6 163.0 35.6Q163.6 35.6 163.7 35.6Q163.8 35.5 164.8 35.4Q165.8 35.2 166.1 35.1Q166.4 35.0 166.7 35.0Q167.0 35.0 168.7 34.5Q170.4 34.0 172.2 33.1Q174.1 32.2 175.0 31.7Q175.9 31.1 176.8 30.4Q177.6 29.8 178.8 28.5Q180.0 27.2 180.3 26.8Q180.6 26.2 180.7 25.8Q180.8 25.2 180.3 24.8Q179.9 24.4 179.1 24.1Q178.2 23.9 177.4 23.4Q176.5 23.0 175.7 22.8Q174.9 22.5 174.4 22.2Q174.0 22.0 173.7 21.9Q173.4 21.9 172.1 21.3Q170.9 20.8 170.6 20.8Q170.4 20.8 170.1 20.9Q169.8 21.0 168.8 22.0Q167.8 23.0 166.9 23.6Q166.0 24.2 165.0 24.7Q164.0 25.1 163.3 25.3Q162.6 25.5 161.8 25.6Q160.9 25.6 160.8 25.7Q160.8 25.8 159.1 25.7Q157.5 25.6 156.5 25.4Q155.5 25.1 153.9 24.4Q152.4 23.6 151.3 22.6Q150.2 21.5 149.8 20.8Q149.4 20.0 149.2 18.8Q149.0 17.5 149.1 17.4Q149.1 17.4 149.1 16.9Q149.1 16.5 149.6 15.5Q150.0 14.5 151.2 13.2Q152.5 12.0 153.5 11.4Q154.5 10.9 156.3 10.4Q158.1 9.9 159.8 9.9Q161.4 9.9 162.1 10.1Q162.9 10.4 163.4 10.4Q163.9 10.5 164.2 10.6Q164.6 10.8 165.8 11.4Q166.9 12.0 167.5 12.5Q168.1 13.0 168.8 13.7Q169.4 14.4 169.6 14.5Q169.9 14.6 170.6 14.6Q171.4 14.5 172.0 14.2Q172.6 13.9 175.0 13.1Q177.4 12.2 178.8 11.6Q180.2 11.0 180.5 10.8Q180.8 10.5 180.8 10.2Q180.9 9.9 180.8 9.6Q180.6 9.2 180.3 8.8Q180.0 8.4 178.7 7.1Q177.4 5.8 175.9 4.7Q174.4 3.6 172.3 2.6Q170.2 1.6 167.9 1.0Q165.5 0.4 164.8 0.3Q164.1 0.2 164.1 0.2Q164.0 0.1 163.2 0.1Q162.5 0.1 162.4 0.1Q162.4 0.0 159.6 0.0Q156.8 0.0 156.7 0.1Q156.6 0.1 156.1 0.1Q155.5 0.1 152.9 0.7Q150.2 1.2 148.2 2.1Q146.2 2.9 146.1 3.0Q146.0 3.1 145.2 3.5Q144.4 3.9 143.4 4.6Q142.4 5.2 140.8 6.8Q139.1 8.4 138.4 9.2ZM50.4 9.1Q49.6 10.1 48.9 11.5Q48.2 12.9 47.8 14.5Q47.4 16.1 47.4 17.9Q47.4 19.6 47.9 21.3Q48.4 23.0 49.0 24.2Q49.6 25.4 50.4 26.5Q51.2 27.6 52.3 28.7Q53.4 29.8 54.6 30.7Q55.9 31.6 57.7 32.6Q59.5 33.5 60.9 34.0Q62.4 34.5 63.6 34.8Q64.8 35.1 66.2 35.3Q67.6 35.5 67.7 35.6Q67.8 35.6 68.5 35.6Q69.2 35.6 69.3 35.7Q69.4 35.8 72.4 35.7Q75.4 35.6 75.4 35.6Q75.5 35.5 75.9 35.5Q76.2 35.5 77.9 35.2Q79.5 34.9 80.3 34.6Q81.1 34.2 81.9 34.1Q82.6 33.9 83.9 33.3Q85.2 32.8 87.4 31.4Q89.5 30.0 90.9 28.6Q92.4 27.1 93.1 26.0Q93.9 24.9 94.4 23.8Q94.9 22.8 95.1 21.9Q95.4 21.1 95.4 20.4Q95.5 19.8 95.6 19.7Q95.6 19.6 95.6 19.1Q95.6 18.5 95.7 18.4Q95.8 18.4 95.8 17.6Q95.8 16.9 95.7 16.8Q95.6 16.8 95.6 16.3Q95.6 15.9 95.4 15.0Q95.2 14.1 94.6 12.6Q94.0 11.0 93.0 9.6Q92.0 8.1 90.6 6.8Q89.1 5.4 87.8 4.5Q86.5 3.6 84.4 2.6Q82.2 1.6 79.8 1.0Q77.4 0.4 76.6 0.3Q75.9 0.2 75.8 0.2Q75.8 0.1 74.9 0.1Q74.0 0.1 73.9 0.1Q73.9 0.0 71.4 0.0Q68.9 0.0 68.8 0.1Q68.8 0.1 68.1 0.1Q67.5 0.1 67.4 0.2Q67.4 0.2 66.6 0.3Q65.9 0.4 63.6 0.9Q61.4 1.5 60.2 1.9Q59.1 2.4 57.4 3.2Q55.8 4.1 54.3 5.2Q52.9 6.4 52.0 7.2Q51.1 8.1 50.4 9.1ZM61.3 15.8Q61.6 15.0 61.8 14.7Q62.0 14.4 63.1 13.3Q64.1 12.2 65.6 11.5Q67.0 10.8 68.8 10.4Q70.5 10.0 71.6 10.0Q72.8 10.0 72.8 10.1Q72.9 10.1 73.5 10.2Q74.1 10.2 75.3 10.6Q76.5 10.9 77.2 11.2Q78.0 11.6 78.9 12.2Q79.8 12.9 80.2 13.3Q80.6 13.8 81.0 14.2Q81.4 14.8 81.7 15.4Q82.0 16.1 82.1 16.8Q82.1 17.5 82.2 17.6Q82.2 17.6 82.2 18.4Q82.1 19.1 81.8 20.0Q81.4 20.9 81.1 21.3Q80.8 21.8 80.1 22.4Q79.5 23.0 78.9 23.4Q78.2 23.9 77.5 24.2Q76.8 24.6 75.6 25.0Q74.5 25.4 73.6 25.4Q72.8 25.5 72.7 25.6Q72.6 25.6 71.6 25.6Q70.6 25.6 70.6 25.6Q70.5 25.5 69.6 25.4Q68.8 25.4 68.1 25.2Q67.4 25.0 66.2 24.5Q65.0 24.0 64.3 23.5Q63.6 23.0 62.8 22.1Q62.0 21.2 61.7 20.7Q61.4 20.1 61.1 19.0Q60.9 17.9 60.9 17.2Q61.0 16.5 61.3 15.8Z", "ww": 272.88, "wh": 35.75};
+  const LOGO_GREEN = '#8eb943';
+  let P2D = null;
+  const paths = () => P2D || (P2D = { cat: new Path2D(LOGO.cat), eyes: new Path2D(LOGO.eyes), word: new Path2D(LOGO.word) });
+  const ALLTEXT = JSON.stringify(CARDS) + JSON.stringify(TYPE) + JSON.stringify(SETS) + Object.values(TIERS).map(t => t.label).join('') +
+    '基礎一階覺醒二階從傳奇特性剋制抵抗撤離指令卡夥伴道具裝備場地基本特殊資源每回合只能使用張先攻玩家的第一回合不能可以任意裝在你場上隻身上放到後雙方都適用有新會蓋掉舊進牌組數沒限制從手牌貼同名裡最多被擊倒時對手拿戰利品每包全種稀有度保底以上展示用頁面不涉及付款收藏撕開·●◆★✦○→×−—…+0123456789NoP./「」、，。：（） ' +
+    '異色重生第二彈兩俠貓集結第一彈每包張全種稀有度保底以上展示用頁面不涉及付款收藏內含隨機卡片封面經典皇冠國王彩虹全息撕開·●◆★✦→×−+0123456789NoP./ ';
+  const fontsReady = (document.fonts && document.fonts.load)
+    ? Promise.race([
+        Promise.all(['400', '500', '700', '900'].map(w => document.fonts.load(`${w} 20px "Noto Sans TC"`, ALLTEXT)).concat([
+          document.fonts.load('800 30px Unbounded', 'NOXCATTCGCYBERCOLLECTIONSRUSEDITIONOYALH0123456789/'),
+          document.fonts.load('600 16px Unbounded', 'NOXCATTCG0123456789/NP')
+        ])),
+        new Promise(r => setTimeout(r, 3500))
+      ]).catch(() => {})
+    : Promise.resolve();
+  function rr(x, X, Y, W, H, r) { x.beginPath(); x.moveTo(X + r, Y); x.arcTo(X + W, Y, X + W, Y + H, r); x.arcTo(X + W, Y + H, X, Y + H, r); x.arcTo(X, Y + H, X, Y, r); x.arcTo(X, Y, X + W, Y, r); x.closePath(); }
+  function mixHex(a, b, t) { const p = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)); const A = p(a), B = p(b); return `rgb(${A.map((v, i) => Math.round(v * t + B[i] * (1 - t))).join(',')})`; }
+  const NOSTART = '，。、！？：；）」』…';
+  // CJK breaks anywhere; runs of latin letters/digits (NOXCAT, 24K, −30) stay whole
+  function wrap(x, text, maxW) {
+    const tokens = text.match(/[A-Za-z0-9+\-−×.%]+|./gu) || [];
+    const lines = []; let line = '';
+    for (const tk of tokens) {
+      const t = line + tk;
+      if (x.measureText(t).width > maxW && line.trim() && !NOSTART.includes(tk)) { lines.push(line.trimEnd()); line = tk === ' ' ? '' : tk; }
+      else line = t;
+    }
+    if (line.trim()) lines.push(line.trimEnd());
+    return lines;
+  }
+  function spaced(x, text, cx, y, gap) {
+    const ws = [...text].map(ch => x.measureText(ch).width);
+    const total = ws.reduce((a, b) => a + b, 0) + gap * (ws.length - 1);
+    let px = cx - total / 2; x.textAlign = 'left';
+    [...text].forEach((ch, i) => { x.fillText(ch, px, y); px += ws[i] + gap; });
+  }
+  function cover(x, img, X, Y, W, H, anchorTop) {
+    if (!img) { x.fillStyle = '#1b1e16'; x.fillRect(X, Y, W, H); return; }
+    const s = Math.max(W / img.width, H / img.height), w = img.width * s, h = img.height * s;
+    x.drawImage(img, X + (W - w) / 2, anchorTop ? Y : Y + (H - h) / 2, w, h);
+  }
+  function blurFill(x, img, X, Y, W, H) {
+    if (!img) return;
+    const sm = document.createElement('canvas'); sm.width = 18; sm.height = 26;
+    cover(sm.getContext('2d'), img, 0, 0, 18, 26);
+    x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
+    x.drawImage(sm, X - W * 0.1, Y - H * 0.06, W * 1.2, H * 1.12);
+  }
+  function logoAt(x, cx, cy, size, glow, fill) {
+    const P = paths();
+    x.save(); x.translate(cx - size / 2, cy - size / 2);
+    if (glow) { x.shadowColor = 'rgba(142,185,67,.75)'; x.shadowBlur = glow; }
+    rr(x, 0, 0, size, size, size * 0.23); x.fillStyle = fill || LOGO_GREEN; x.fill(); x.shadowBlur = 0;
+    const k = size * 0.76 / LOGO.cw;
+    x.translate((size - LOGO.cw * k) / 2, (size - LOGO.ch * k) / 2 + size * 0.02); x.scale(k, k);
+    x.fillStyle = '#1f1c1b'; x.fill(P.cat); x.fillStyle = '#ffffff'; x.fill(P.eyes);
+    x.restore();
+  }
+  function markAt(x, X, Y, h, color, eye) {
+    const P = paths(), k = h / LOGO.ch;
+    x.save(); x.translate(X, Y); x.scale(k, k);
+    x.fillStyle = color; x.fill(P.cat); x.fillStyle = eye || '#ffffff'; x.fill(P.eyes);
+    x.restore();
+    return LOGO.cw * k;
+  }
+  function wordAt(x, X, baseY, h, color, align) {
+    const P = paths(), k = h / LOGO.wh, w = LOGO.ww * k;
+    const x0 = align === 'center' ? X - w / 2 : align === 'right' ? X - w : X;
+    x.save(); x.translate(x0, baseY - h); x.scale(k, k); x.fillStyle = color; x.fill(P.word, 'evenodd'); x.restore();
+    return w;
+  }
+  function wordTCG(x, cx, baseY, h, color) {
+    x.font = `800 ${Math.round(h * 0.95)}px ${FM}`;
+    const tw = x.measureText('TCG').width, w = LOGO.ww * h / LOGO.wh, gap = h * 0.5;
+    const x0 = cx - (w + gap + tw) / 2;
+    wordAt(x, x0, baseY, h, color, 'left');
+    x.fillStyle = color; x.textAlign = 'left'; x.fillText('TCG', x0 + w + gap, baseY);
+  }
+  function rainbow(x, x0, y0, x1, y1, a) {
+    const g = x.createLinearGradient(x0, y0, x1, y1);
+    [0, 50, 120, 190, 260, 320].forEach((h, i, arr) => g.addColorStop(i / (arr.length - 1), `hsla(${h},95%,68%,${a})`));
+    return g;
+  }
+  function grad(x, x0, y0, x1, y1, stops) { const g = x.createLinearGradient(x0, y0, x1, y1); stops.forEach(([o, c]) => g.addColorStop(o, c)); return g; }
+  function rng(seed) { let a = seed * 9301 + 49297; return () => { a = (a * 1103515245 + 12345) % 2147483648; return a / 2147483648; }; }
+  const RIM = {
+    N: [[0, '#40443a'], [1, '#1c1f18']],
+    B: [[0, '#40443a'], [1, '#1c1f18']],
+    R: [[0, '#eef1f5'], [.25, '#9aa1ab'], [.5, '#f7f8fa'], [.75, '#7f8792'], [1, '#dfe3e8']],
+    SR: [[0, '#f4f6fb'], [.3, '#a7b2c6'], [.5, '#ffffff'], [.7, '#9aa6bd'], [1, '#e7ecf5']],
+    SSR: [[0, '#fff2ad'], [.28, '#d39a2c'], [.5, '#fff6cc'], [.72, '#b37814'], [1, '#ffe07f']],
+    UR: [[0, '#f2fbff'], [.25, '#8fd0ff'], [.5, '#ffffff'], [.75, '#7fb6ff'], [1, '#d9f3ff']]
+  };
+  const PANEL = { N: '#121410', B: '#121410', R: '#111316', SR: '#0f1218', SSR: '#17120a' };
+  const CW = 600, CH = 838;
+  const SUBCOL = { 夥伴: '#ff9a6b', 道具: '#5fd0ff', 裝備: '#c48cff', 場地: '#7fd858' };
+  const SUBRULE = {
+    夥伴: '夥伴卡每回合只能使用 1 張。先攻玩家的第一回合不能使用。',
+    道具: '道具卡每回合可以使用任意張。',
+    裝備: '裝在你場上的 1 隻 NOXCAT 身上。每隻 NOXCAT 只能裝 1 張裝備卡。',
+    場地: '放到場上後雙方都適用。場上只能有 1 張場地卡，新的會蓋掉舊的。'
+  };
+  const ENERGY_RULE = {
+    basic: '基本資源放進牌組的張數沒有限制。每回合可以從手牌貼 1 張資源到你的 NOXCAT 身上。',
+    special: '同名的特殊資源，牌組裡最多放 3 張。每回合可以從手牌貼 1 張資源到你的 NOXCAT 身上。'
+  };
+  const LEGEND_RULE = '傳奇 NOXCAT 被擊倒時，對手拿 2 張戰利品。';
+  const STAGE = ['基礎', '一階覺醒', '二階覺醒'];
+  const kindLabel = c => c.kind === 'cat' ? `${TYPE[c.type].name} NOXCAT` : c.kind === 'cmd' ? `指令卡・${c.sub}` : (c.basic ? '基本資源' : '特殊資源');
+  const accentOf = c => c.kind === 'cmd' ? SUBCOL[c.sub] : c.type === 'any' ? '#b4f01e' : TYPE[c.type].c;
+
+  function typeDot(x, t, cx, cy, r) {
+    const A = TYPE[t];
+    x.fillStyle = A.c; x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.fill();
+    x.strokeStyle = 'rgba(0,0,0,.35)'; x.lineWidth = Math.max(1, r * 0.1); x.stroke();
+    x.fillStyle = '#0d1203'; x.font = `900 ${Math.round(r * 1.08)}px ${FB}`; x.textAlign = 'center';
+    x.fillText(A.n, cx, cy + r * 0.38);
+  }
+  function pill(x, text, X, baseY, col, fill, font) {
+    x.font = font || `700 15px ${FB}`;
+    const w = x.measureText(text).width + 22;
+    rr(x, X, baseY - 17, w, 24, 12); x.fillStyle = fill || 'rgba(8,9,7,.6)'; x.fill();
+    x.lineWidth = 1.5; x.strokeStyle = col; x.stroke();
+    x.fillStyle = col; x.textAlign = 'left'; x.fillText(text, X + 11, baseY);
+    return w;
+  }
+  function topLine(x, c, L, y) {
+    x.textBaseline = 'alphabetic';
+    const col = accentOf(c);
+    let label, sub = '';
+    if (c.kind === 'cat') { label = STAGE[c.stage]; if (c.from) sub = `從「${c.from}」覺醒`; }
+    else if (c.kind === 'cmd') label = `指令卡・${c.sub}`;
+    else label = c.basic ? '基本資源' : '特殊資源';
+    let nx = L + pill(x, label, L, y, col) + 8;
+    if (c.legend) {
+      x.font = `800 15px ${FB}`;
+      const w = x.measureText('傳奇').width + 22;
+      rr(x, nx, y - 17, w, 24, 12); x.fillStyle = grad(x, nx, 0, nx + w, 0, [[0, '#ffe07f'], [0.5, '#fff6cc'], [1, '#d39a2c']]); x.fill();
+      x.fillStyle = '#2a1d04'; x.textAlign = 'left'; x.fillText('傳奇', nx + 11, y);
+      nx += w + 8;
+    }
+    if (sub) { x.font = `500 15px ${FB}`; x.fillStyle = '#c9cfbe'; x.textAlign = 'left'; x.fillText(sub, nx + 2, y); }
+  }
+  function drawHeader(x, c, L, R, base) {
+    x.textBaseline = 'alphabetic';
+    const tcx = R - 20, tcy = base - 13;
+    let rightEdge;
+    if (c.kind === 'cat') {
+      typeDot(x, c.type, tcx, tcy, 20);
+      const npX = R - 52;
+      x.textAlign = 'right'; x.font = `800 32px ${FM}`; x.fillStyle = '#f2f5ea'; x.fillText(String(c.np), npX, base);
+      const npW = x.measureText(String(c.np)).width;
+      x.font = `600 14px ${FM}`; x.fillStyle = '#a8af9b'; x.fillText('NP', npX - npW - 6, base);
+      rightEdge = npX - npW - 6 - x.measureText('NP').width - 14;
+    } else if (c.kind === 'cmd') {
+      x.fillStyle = SUBCOL[c.sub]; x.beginPath(); x.arc(tcx, tcy, 20, 0, Math.PI * 2); x.fill();
+      x.fillStyle = '#0d1203'; x.font = `900 20px ${FB}`; x.textAlign = 'center'; x.fillText(c.sub[0], tcx, tcy + 7);
+      rightEdge = R - 54;
+    } else {
+      if (c.type === 'any') {
+        x.fillStyle = rainbow(x, tcx - 20, 0, tcx + 20, 0, 1); x.beginPath(); x.arc(tcx, tcy, 20, 0, Math.PI * 2); x.fill();
+        x.fillStyle = '#0d1203'; x.font = `900 20px ${FB}`; x.textAlign = 'center'; x.fillText('特', tcx, tcy + 7);
+      } else typeDot(x, c.type, tcx, tcy, 20);
+      rightEdge = R - 54;
+    }
+    const nameMax = rightEdge - L;
+    let fs = 38; x.font = `900 ${fs}px ${FB}`;
+    while (x.measureText(c.name).width > nameMax && fs > 22) { fs -= 2; x.font = `900 ${fs}px ${FB}`; }
+    x.textAlign = 'left'; x.fillStyle = '#f7faf0'; x.fillText(c.name, L, base);
+  }
+  function tierBadge(x, T, X, Y) {
+    x.font = `800 17px ${FM}`; const tw = x.measureText(T.code).width;
+    x.font = `700 15px ${FB}`; const lw = x.measureText(T.label).width;
+    const w = tw + lw + 34;
+    const col = T.code === 'SEC' ? rainbow(x, X, Y, X + w, Y, 1) : T.col;
+    rr(x, X, Y, w, 32, 16); x.fillStyle = 'rgba(8,9,7,.8)'; x.fill();
+    x.lineWidth = 1.5; x.strokeStyle = col; x.stroke();
+    x.textAlign = 'left'; x.textBaseline = 'alphabetic';
+    x.font = `800 17px ${FM}`; x.fillStyle = col; x.fillText(T.code, X + 13, Y + 23);
+    x.font = `700 15px ${FB}`; x.fillStyle = '#f2f5ea'; x.fillText(T.label, X + 21 + tw, Y + 22);
+  }
+  // one attack or ability; returns its height
+  function moveBlock(x, m, L, R, y, s, dry) {
+    let tx;
+    if (m.ability) {
+      x.font = `800 ${Math.round(15 * s)}px ${FB}`;
+      const lw = x.measureText('特性').width + 18 * s;
+      if (!dry) { rr(x, L, y + 7 * s, lw, 26 * s, 13 * s); x.fillStyle = '#e0483e'; x.fill(); x.fillStyle = '#fff'; x.textAlign = 'left'; x.fillText('特性', L + 9 * s, y + 25.5 * s); }
+      tx = L + lw + 10 * s;
+    } else {
+      const step = 29 * s;
+      if (!dry) m.cost.forEach((t, k) => typeDot(x, t, L + 14 * s + k * step, y + 20 * s, 13.5 * s));
+      tx = L + m.cost.length * step + 8 * s;
+    }
+    if (!dry) {
+      if (m.dmg) { x.font = `800 ${Math.round(30 * s)}px ${FM}`; x.textAlign = 'right'; x.fillStyle = '#f2f5ea'; x.fillText(m.dmg, R, y + 32 * s); }
+      x.textAlign = 'left'; x.font = `900 ${Math.round(23 * s)}px ${FB}`; x.fillStyle = m.ability ? '#ff9a8f' : '#f2f5ea'; x.fillText(m.name, tx, y + 28 * s);
+    }
+    x.font = `400 ${Math.round(18 * s)}px ${FB}`;
+    const lh = 24 * s, lines = m.text ? wrap(x, m.text, R - L - 22 * s) : [];
+    if (!dry) { x.fillStyle = '#c3c9b6'; x.textAlign = 'left'; lines.forEach((l, j) => x.fillText(l, L + 2, y + 57 * s + j * lh)); }
+    return Math.max(42 * s, 38 * s + lines.length * lh + (lines.length ? 6 * s : 0));
+  }
+  function statsRow(x, c, L, R, y, s) {
+    const h = 34 * s, cy = y + h / 2, colW = (R - L) / 3;
+    rr(x, L, y, R - L, h, 10 * s); x.fillStyle = 'rgba(255,255,255,.06)'; x.fill();
+    x.strokeStyle = 'rgba(255,255,255,.08)'; x.lineWidth = 1; x.stroke();
+    const lab = (t, X) => { x.font = `500 ${Math.round(14 * s)}px ${FB}`; x.fillStyle = '#a8af9b'; x.textAlign = 'left'; x.fillText(t, X, cy + 5 * s); return X + x.measureText(t).width + 8 * s; };
+    const val = (t, X) => { x.font = `700 ${Math.round(15 * s)}px ${FM}`; x.fillStyle = '#f2f5ea'; x.textAlign = 'left'; x.fillText(t, X, cy + 5.5 * s); };
+    const r = 10.5 * s;
+    let X = lab('剋制', L + 12 * s); typeDot(x, WEAK[c.type], X + r, cy, r); val('×2', X + 2 * r + 5 * s);
+    X = lab('抵抗', L + colW + 10 * s);
+    const rs = (c.stage > 0 || c.legend) ? RESIST[c.type] : null;
+    if (rs) { typeDot(x, rs, X + r, cy, r); val('−30', X + 2 * r + 5 * s); } else val('—', X);
+    X = lab('撤離', L + colW * 2 + 8 * s);
+    if (c.retreat) for (let i = 0; i < c.retreat; i++) typeDot(x, 'any', X + r + i * (2 * r + 3 * s), cy, r); else val('0', X);
+    for (let i = 1; i < 3; i++) { x.fillStyle = 'rgba(255,255,255,.1)'; x.fillRect(L + colW * i, y + 7 * s, 1, h - 14 * s); }
+    return h;
+  }
+  function oneLine(x, text, maxW) {
+    if (x.measureText(text).width <= maxW) return text;
+    let t = text; while (t.length > 1 && x.measureText(t + '…').width > maxW) t = t.slice(0, -1);
+    return t + '…';
+  }
+  // the text half of a card; dry run measures only
+  function drawBody(x, c, L, R, y, s, dry, withFlavor) {
+    const y0 = y;
+    if (c.kind === 'cat') {
+      c.moves.forEach((m, i) => {
+        y += moveBlock(x, m, L, R, y, s, dry);
+        if (i < c.moves.length - 1) { if (!dry) { x.fillStyle = 'rgba(255,255,255,.09)'; x.fillRect(L, y + 4 * s, R - L, 2); } y += 12 * s; }
+      });
+      y += 8 * s;
+      if (!dry) statsRow(x, c, L, R, y, s);
+      y += 34 * s;
+      if (c.legend) {
+        x.font = `700 ${Math.round(15 * s)}px ${FB}`;
+        if (!dry) { x.fillStyle = '#ffd77a'; x.textAlign = 'left'; x.fillText(oneLine(x, LEGEND_RULE, R - L), L + 2, y + 22 * s); }
+        y += 28 * s;
+      }
+      if (withFlavor && c.flavor) {
+        x.font = `400 ${Math.round(16 * s)}px ${FB}`;
+        if (!dry) { x.fillStyle = '#b8bfab'; x.textAlign = 'left'; x.fillText(oneLine(x, c.flavor, R - L), L + 2, y + 24 * s); }
+        y += 30 * s;
+      }
+    } else {
+      x.font = `700 ${Math.round(22 * s)}px ${FB}`;
+      const lines = wrap(x, c.text, R - L - 26 * s), lh = 32 * s;
+      if (!dry) { x.fillStyle = '#f2f5ea'; x.textAlign = 'left'; lines.forEach((l, j) => x.fillText(l, L + 2, y + 28 * s + j * lh)); }
+      y += 14 * s + lines.length * lh;
+      const rule = c.kind === 'cmd' ? SUBRULE[c.sub] : ENERGY_RULE[c.basic ? 'basic' : 'special'];
+      if (!dry) { x.fillStyle = 'rgba(255,255,255,.12)'; x.fillRect(L, y + 4 * s, R - L, 2); }
+      y += 10 * s;
+      x.font = `400 ${Math.round(16 * s)}px ${FB}`;
+      const rl = wrap(x, rule, R - L - 20 * s), rh = 23 * s;
+      if (!dry) { x.fillStyle = '#a8af9b'; rl.forEach((l, j) => x.fillText(l, L + 2, y + 22 * s + j * rh)); }
+      y += 8 * s + rl.length * rh;
+    }
+    return y - y0;
+  }
+  // pick a text scale (and whether the flavor line fits) for a body box
+  function fitBody(x, c, L, R, avail) {
+    for (const s of [1, .94, .88, .82, .76, .7, .64]) {
+      if (drawBody(x, c, L, R, 0, s, true, true) <= avail) return { s, flavor: true };
+      if (drawBody(x, c, L, R, 0, s, true, false) <= avail) return { s, flavor: false };
+    }
+    return { s: .6, flavor: false };
+  }
+  function footer(x, c, T, L, R, y) {
+    x.textBaseline = 'alphabetic';
+    x.font = `800 14px ${FM}`; x.textAlign = 'left';
+    x.fillStyle = T.code === 'SEC' ? rainbow(x, L, 0, L + 90, 0, 1) : (T.code === 'N' || c.basic ? '#f2f5ea' : T.col);
+    x.fillText(`${T.sym} ${T.code}`, L, y);
+    x.font = `500 14px ${FB}`; x.fillStyle = '#a8af9b'; x.textAlign = 'center';
+    x.fillText(`${SETS[c.set].label} · No.${c.no} · ${kindLabel(c)}`, CW / 2, y);
+    x.font = `600 14px ${FM}`; x.textAlign = 'right'; x.fillText(`${c.sn}/${String(SETS[c.set].total).padStart(3, '0')}`, R, y);
+  }
+  function corners(x, X, Y, W, H, col, len) {
+    x.strokeStyle = col; x.lineWidth = 3; x.lineCap = 'round';
+    [[X, Y, 1, 1], [X + W, Y, -1, 1], [X, Y + H, 1, -1], [X + W, Y + H, -1, -1]].forEach(([cx, cy, sx, sy]) => {
+      x.beginPath(); x.moveTo(cx, cy + sy * len); x.lineTo(cx, cy); x.lineTo(cx + sx * len, cy); x.stroke();
+    });
+    x.lineCap = 'butt';
+  }
+  const diamond = (x, cx, cy, r) => { x.beginPath(); x.moveTo(cx, cy - r); x.lineTo(cx + r, cy); x.lineTo(cx, cy + r); x.lineTo(cx - r, cy); x.closePath(); x.fill(); };
+  // draw img into a window: cats keep the face (top), everything else is centred
+  function artInto(x, img, a, anchor) {
+    if (!img) { x.fillStyle = '#1b1e16'; x.fillRect(a.x, a.y, a.w, a.h); return; }
+    const s = Math.max(a.w / img.width, a.h / img.height), w = img.width * s, h = img.height * s;
+    x.drawImage(img, a.x + (a.w - w) / 2, a.y + (a.h - h) * anchor, w, h);
+  }
+
+  async function drawCardFace(c) {
+    await fontsReady;
+    const img = await loadArt(c.id);
+    const cv = document.createElement('canvas'); cv.width = CW; cv.height = CH;
+    const x = cv.getContext('2d');
+    const T = TIERS[c.tier];
+    if (T.full) drawFull(x, c, T, img); else drawStd(x, c, T, img);
+    return cv;
+  }
+  function drawStd(x, c, T, img) {
+    const k = c.tier, acc = accentOf(c);
+    rr(x, 0, 0, CW, CH, 30); x.fillStyle = grad(x, 0, 0, CW, CH, RIM[k]); x.fill();
+    if (k === 'SR') { rr(x, 0, 0, CW, CH, 30); x.fillStyle = rainbow(x, 0, 0, CW, CH, 0.42); x.fill(); }
+    rr(x, 18, 18, CW - 36, CH - 36, 16);
+    x.fillStyle = grad(x, 0, 18, 0, 18 + (CH - 36) * 0.3, [[0, mixHex(acc, PANEL[k], 0.24)], [1, PANEL[k]]]); x.fill();
+    if (k === 'N' || k === 'B') { x.strokeStyle = k === 'B' ? acc : 'rgba(180,240,30,.3)'; x.globalAlpha = k === 'B' ? 0.55 : 1; x.lineWidth = 2; rr(x, 25, 25, CW - 50, CH - 50, 12); x.stroke(); x.globalAlpha = 1; }
+    if (k === 'R') { x.strokeStyle = 'rgba(230,234,240,.4)'; x.lineWidth = 2; rr(x, 25, 25, CW - 50, CH - 50, 12); x.stroke(); corners(x, 25, 25, CW - 50, CH - 50, '#b4f01e', 26); }
+    if (k === 'SR') { x.strokeStyle = rainbow(x, 0, 0, CW, CH, 0.85); x.lineWidth = 2.5; rr(x, 25, 25, CW - 50, CH - 50, 12); x.stroke(); }
+    if (k === 'SSR') {
+      x.strokeStyle = '#e7b54a'; x.lineWidth = 2; rr(x, 25, 25, CW - 50, CH - 50, 12); x.stroke();
+      x.strokeStyle = 'rgba(231,181,74,.45)'; x.lineWidth = 1.2; rr(x, 31, 31, CW - 62, CH - 62, 9); x.stroke();
+      x.fillStyle = '#f5c451'; diamond(x, 300, 25, 8); diamond(x, 300, CH - 25, 8);
+    }
+    topLine(x, c, 40, 54);
+    drawHeader(x, c, 40, CW - 40, 98);
+    // art grows or shrinks so the text always fits
+    const L = 40, R = CW - 40, top = 110, bottom = 786;
+    const need = drawBody(x, c, L, R, 0, 1, true, c.kind === 'cat');
+    const ah = Math.max(300, Math.min(c.kind === 'cat' ? 480 : 540, bottom - 12 - need - top));
+    c._ah = ah;
+    const fit = fitBody(x, c, L, R, bottom - (top + ah + 12));
+    const a = { x: 34, y: top, w: 532, h: ah };
+    x.save(); rr(x, a.x, a.y, a.w, a.h, 10); x.clip();
+    artInto(x, img, a, c.kind === 'cat' || c.sub === '夥伴' ? 0.12 : 0.5);
+    x.restore();
+    if (k === 'N' || k === 'B') { x.lineWidth = 5; x.strokeStyle = '#2f3329'; rr(x, a.x + 2.5, a.y + 2.5, a.w - 5, a.h - 5, 9); x.stroke(); }
+    if (k === 'R') { x.lineWidth = 6; x.strokeStyle = grad(x, a.x, a.y, a.x + a.w, a.y + a.h, RIM.R); rr(x, a.x + 3, a.y + 3, a.w - 6, a.h - 6, 9); x.stroke(); x.lineWidth = 1.5; x.strokeStyle = '#b4f01e'; rr(x, a.x + 7, a.y + 7, a.w - 14, a.h - 14, 6); x.stroke(); }
+    if (k === 'SR') { x.lineWidth = 7; x.strokeStyle = '#f4f7ff'; rr(x, a.x + 3.5, a.y + 3.5, a.w - 7, a.h - 7, 9); x.stroke(); x.lineWidth = 2; x.strokeStyle = rainbow(x, a.x, a.y, a.x + a.w, a.y + a.h, 1); rr(x, a.x + 8, a.y + 8, a.w - 16, a.h - 16, 6); x.stroke(); }
+    if (k === 'SSR') {
+      x.lineWidth = 9; x.strokeStyle = grad(x, a.x, a.y, a.x + a.w, a.y + a.h, RIM.SSR); rr(x, a.x + 4.5, a.y + 4.5, a.w - 9, a.h - 9, 9); x.stroke();
+      x.lineWidth = 2; x.strokeStyle = '#3a2a08'; rr(x, a.x + 10, a.y + 10, a.w - 20, a.h - 20, 5); x.stroke();
+      x.fillStyle = '#fff2ad';
+      [[a.x + 9, a.y + 9], [a.x + a.w - 9, a.y + 9], [a.x + 9, a.y + a.h - 9], [a.x + a.w - 9, a.y + a.h - 9]].forEach(([dx, dy]) => diamond(x, dx, dy, 9));
+    }
+    if (!c.basic) tierBadge(x, T, a.x + 16, a.y + a.h - 48);
+    drawBody(x, c, L, R, a.y + a.h + 12, fit.s, false, fit.flavor);
+    footer(x, c, T, L, R, CH - 30);
+  }
+  function drawFull(x, c, T, img) {
+    const sec = T.code === 'SEC';
+    rr(x, 0, 0, CW, CH, 30);
+    x.fillStyle = sec ? rainbow(x, 0, 0, CW, CH, 1) : grad(x, 0, 0, CW, CH, RIM.UR); x.fill();
+    const L = 46, R = CW - 46, bottom = 784;
+    const need = drawBody(x, c, L, R, 0, 1, true, true);
+    const pTop = Math.max(456, bottom - need - 12);
+    const fit = fitBody(x, c, L, R, bottom - pTop - 12);
+    x.save(); rr(x, 14, 14, CW - 28, CH - 28, 20); x.clip();
+    x.fillStyle = '#08090a'; x.fillRect(0, 0, CW, CH);
+    blurFill(x, img, 14, 14, CW - 28, CH - 28);
+    x.fillStyle = 'rgba(6,7,8,.38)'; x.fillRect(0, 0, CW, CH);
+    if (img) {
+      const s = 572 / img.width, h = img.height * s;
+      x.drawImage(img, 14, c.kind === 'cat' ? 46 : Math.min(60, (pTop - h) / 2 + 30), 572, h);
+    }
+    x.fillStyle = grad(x, 0, 14, 0, 170, [[0, 'rgba(6,7,8,.9)'], [1, 'rgba(6,7,8,0)']]); x.fillRect(0, 0, CW, 180);
+    x.fillStyle = grad(x, 0, pTop - 140, 0, pTop + 20, [[0, 'rgba(6,7,8,0)'], [1, 'rgba(6,7,8,.9)']]); x.fillRect(0, pTop - 140, CW, CH);
+    if (sec) {
+      x.globalAlpha = 0.09; x.lineWidth = 2;
+      for (let i = -CH; i < CW; i += 16) { x.strokeStyle = `hsl(${(i * 1.3 + 720) % 360},100%,70%)`; x.beginPath(); x.moveTo(i, 0); x.lineTo(i + CH * 0.6, CH); x.stroke(); }
+      x.globalAlpha = 1;
+    } else {
+      x.globalAlpha = 0.5; x.fillStyle = '#eafcff';
+      const Rg = rng(9);
+      for (let i = 0; i < 60; i++) { const px = 20 + Rg() * 560, py = 20 + Rg() * 560, s = 0.8 + Rg() * 2.2; x.beginPath(); x.moveTo(px, py - s * 3); x.lineTo(px + s, py); x.lineTo(px, py + s * 3); x.lineTo(px - s, py); x.closePath(); x.fill(); }
+      x.globalAlpha = 1;
+    }
+    x.restore();
+    x.lineWidth = sec ? 3 : 2; x.strokeStyle = sec ? rainbow(x, 0, CH, CW, 0, 0.95) : 'rgba(210,244,255,.75)';
+    rr(x, 22, 22, CW - 44, CH - 44, 14); x.stroke();
+    x.save(); x.shadowColor = 'rgba(0,0,0,.7)'; x.shadowBlur = 10;
+    topLine(x, c, 40, 56);
+    drawHeader(x, c, 40, CW - 40, 100);
+    x.restore();
+    tierBadge(x, T, 40, 116);
+    if (sec) {
+      x.save(); x.translate(500, Math.min(pTop - 70, 520)); x.rotate(-0.22);
+      x.lineWidth = 4; x.strokeStyle = rainbow(x, -56, 0, 56, 0, 1); x.beginPath(); x.arc(0, 0, 54, 0, Math.PI * 2); x.stroke();
+      x.lineWidth = 1.5; x.beginPath(); x.arc(0, 0, 45, 0, Math.PI * 2); x.stroke();
+      x.fillStyle = 'rgba(8,9,10,.55)'; x.beginPath(); x.arc(0, 0, 43, 0, Math.PI * 2); x.fill();
+      x.fillStyle = rainbow(x, -40, 0, 40, 0, 1); x.textAlign = 'center';
+      x.font = `800 15px ${FM}`; x.fillText('SECRET', 0, -2); x.font = `800 12px ${FM}`; x.fillText('RARE', 0, 16);
+      x.restore();
+    }
+    rr(x, 30, pTop, CW - 60, 796 - pTop, 16); x.fillStyle = 'rgba(10,12,10,.66)'; x.fill();
+    x.lineWidth = 1.2; x.strokeStyle = 'rgba(255,255,255,.14)'; x.stroke();
+    drawBody(x, c, L, R, pTop + 6, fit.s, false, fit.flavor);
+    footer(x, c, T, 40, CW - 40, CH - 30);
+  }
+  function drawCardBack() {
+    const cv = document.createElement('canvas'); cv.width = CW; cv.height = CH;
+    const x = cv.getContext('2d');
+    rr(x, 0, 0, CW, CH, 30); x.fillStyle = '#1b1e16'; x.fill();
+    rr(x, 18, 18, CW - 36, CH - 36, 18);
+    const g = x.createRadialGradient(300, 390, 0, 300, 390, 480); g.addColorStop(0, '#203109'); g.addColorStop(1, '#060705');
+    x.fillStyle = g; x.fill();
+    x.save(); x.clip();
+    x.strokeStyle = 'rgba(180,240,30,.08)'; x.lineWidth = 1.5;
+    const s = 26, h = s * Math.sqrt(3);
+    for (let row = -1; row < CH / h + 2; row++) for (let col = -1; col < CW / (s * 1.5) + 2; col++) {
+      const cx = col * s * 1.5, cy = row * h + (col % 2 ? h / 2 : 0);
+      x.beginPath(); for (let i = 0; i < 6; i++) { const an = Math.PI / 3 * i; x[i ? 'lineTo' : 'moveTo'](cx + Math.cos(an) * s * 0.92, cy + Math.sin(an) * s * 0.92); } x.closePath(); x.stroke();
+    }
+    x.strokeStyle = 'rgba(180,240,30,.16)'; x.lineWidth = 3;
+    [150, 200, 260].forEach(r => { x.beginPath(); x.arc(300, 350, r, 0, Math.PI * 2); x.stroke(); });
+    x.restore();
+    x.strokeStyle = 'rgba(180,240,30,.45)'; x.lineWidth = 3; rr(x, 30, 30, CW - 60, CH - 60, 14); x.stroke();
+    corners(x, 44, 44, CW - 88, CH - 88, '#b4f01e', 34);
+    logoAt(x, 300, 345, 210, 80);
+    x.textBaseline = 'alphabetic';
+    wordAt(x, 300, 566, 46, '#f2f5ea', 'center');
+    x.fillStyle = 'rgba(242,245,234,.55)'; x.font = `600 15px ${FM}`; spaced(x, 'CYBERCAT COLLECTION', 300, 600, 5);
+    x.fillStyle = 'rgba(242,245,234,.35)'; x.font = `600 13px ${FM}`; spaced(x, 'TRADING CARD GAME', 300, 760, 6);
+    return cv;
+  }
+  const PW = 600, PH = 960, SEAM = 134;
+  function packFoil(x) {
+    const g = x.createLinearGradient(0, 0, PW * 0.6, PH);
+    g.addColorStop(0, '#1f2418'); g.addColorStop(0.58, '#0b0c09'); g.addColorStop(1, '#191c12');
+    x.fillStyle = g; x.fillRect(0, 0, PW, PH);
+    x.save(); x.globalAlpha = 0.05; x.strokeStyle = '#fff'; x.lineWidth = 4;
+    for (let i = -PH; i < PW + PH; i += 18) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i - PH * 0.7, PH); x.stroke(); }
+    x.restore();
+    const crimp = y => { for (let i = 0; i < PW; i += 16) { x.fillStyle = (i / 16) % 2 ? '#141610' : '#33372d'; x.fillRect(i, y, 16, 26); } };
+    crimp(0); crimp(PH - 26);
+  }
+  async function drawPackFront(P) {
+    await fontsReady;
+    const img = await loadArt(P.art);
+    const cv = document.createElement('canvas'); cv.width = PW; cv.height = PH;
+    const x = cv.getContext('2d');
+    packFoil(x);
+    const acc = P.rainbow ? rainbow(x, 0, SEAM, PW, PH, 1) : P.accent;
+    x.save(); x.beginPath(); x.rect(0, SEAM, PW, 640); x.clip();
+    cover(x, img, 0, SEAM - 10, PW, 650, true);
+    x.fillStyle = grad(x, 0, 520, 0, SEAM + 640, [[0, 'rgba(10,11,8,0)'], [1, 'rgba(10,11,8,1)']]); x.fillRect(0, 500, PW, 300);
+    x.fillStyle = grad(x, 0, SEAM, 0, SEAM + 100, [[0, 'rgba(10,11,8,.8)'], [1, 'rgba(10,11,8,0)']]); x.fillRect(0, SEAM, PW, 100);
+    if (P.rainbow) { x.globalAlpha = 0.08; x.lineWidth = 3; for (let i = -PH; i < PW; i += 18) { x.strokeStyle = `hsl(${(i + 900) % 360},100%,70%)`; x.beginPath(); x.moveTo(i, SEAM); x.lineTo(i + 500, SEAM + 640); x.stroke(); } x.globalAlpha = 1; }
+    x.restore();
+    x.textBaseline = 'alphabetic';
+    wordTCG(x, 300, 96, 24, 'rgba(242,245,234,.72)');
+    x.setLineDash([14, 10]); x.strokeStyle = 'rgba(242,245,234,.6)'; x.lineWidth = 3;
+    x.beginPath(); x.moveTo(24, SEAM); x.lineTo(PW - 24, SEAM); x.stroke(); x.setLineDash([]);
+    x.fillStyle = P.rainbow ? '#ffb8f0' : P.accent; x.font = `700 22px ${FB}`; x.textAlign = 'right'; x.fillText('撕開 →', PW - 30, SEAM - 14);
+    logoAt(x, 64, SEAM + 54, 50, 0);
+    wordAt(x, 100, SEAM + 64, 22, '#f2f5ea', 'left');
+    x.save(); x.translate(PW - 36, SEAM + 44); x.rotate(Math.PI / 2);
+    x.fillStyle = acc; x.font = `800 16px ${FM}`; x.textAlign = 'left'; spacedLeft(x, P.ed, 0, 0, 4);
+    x.restore();
+    x.lineWidth = 4; x.strokeStyle = acc; rr(x, 18, SEAM + 16, PW - 36, PH - SEAM - 60, 22); x.stroke();
+    x.save(); x.shadowColor = P.glow; x.shadowBlur = 36;
+    x.fillStyle = '#f7faf0'; let pfs = 108; x.font = `900 ${pfs}px ${FB}`; while (x.measureText(SETS[P.set].name).width > 540 && pfs > 60) { pfs -= 4; x.font = `900 ${pfs}px ${FB}`; } x.textAlign = 'center'; x.fillText(SETS[P.set].name, 300, 752);
+    x.restore();
+    x.fillStyle = acc; x.font = `800 22px ${FM}`; spaced(x, SETS[P.set].en, 300, 810, 5);
+    rr(x, 140, 836, 320, 46, 23); x.fillStyle = acc; x.fill();
+    x.fillStyle = '#0d1203'; x.font = `700 21px ${FB}`; x.textAlign = 'center'; x.fillText(`全 ${SETS[P.set].total} 種 · 6 種稀有度`, 300, 867);
+    x.fillStyle = '#a8af9b'; x.font = `500 19px ${FB}`; x.fillText(`${SETS[P.set].label} · 每包 5 張`, 300, 914);
+    return cv;
+  }
+  function spacedLeft(x, text, X, y, gap) { let px = X; [...text].forEach(ch => { x.fillText(ch, px, y); px += x.measureText(ch).width + gap; }); }
+  async function drawPackBack(set = 1) {
+    await fontsReady;
+    const cv = document.createElement('canvas'); cv.width = PW; cv.height = PH;
+    const x = cv.getContext('2d');
+    packFoil(x);
+    x.textBaseline = 'alphabetic';
+    wordTCG(x, 300, 96, 24, 'rgba(242,245,234,.72)');
+    x.setLineDash([14, 10]); x.strokeStyle = 'rgba(180,240,30,.5)'; x.lineWidth = 3;
+    x.beginPath(); x.moveTo(24, SEAM); x.lineTo(PW - 24, SEAM); x.stroke(); x.setLineDash([]);
+    logoAt(x, 300, 226, 104, 40);
+    x.textAlign = 'center';
+    x.fillStyle = '#f2f5ea'; let bfs = 56; x.font = `900 ${bfs}px ${FB}`; while (x.measureText(`${SETS[set].label} ${SETS[set].name}`).width > 540 && bfs > 30) { bfs -= 2; x.font = `900 ${bfs}px ${FB}`; } x.fillText(`${SETS[set].label} ${SETS[set].name}`, 300, 346);
+    x.fillStyle = '#9ea592'; x.font = `400 23px ${FB}`;
+    x.fillText('每包 5 張隨機卡片 · 第 4 張保底 R 以上', 300, 396);
+    TIER_ORDER.forEach((k, i) => {
+      const T = TIERS[k], y = 466 + i * 50;
+      rr(x, 90, y - 32, 420, 44, 12); x.fillStyle = 'rgba(255,255,255,.05)'; x.fill();
+      x.textAlign = 'left'; x.font = `800 20px ${FM}`; x.fillStyle = k === 'SEC' ? rainbow(x, 110, 0, 190, 0, 1) : T.col; x.fillText(T.code, 112, y - 2);
+      x.font = `700 22px ${FB}`; x.fillStyle = '#f2f5ea'; x.fillText(T.label, 200, y - 2);
+      x.textAlign = 'right'; x.font = `500 20px ${FB}`; x.fillStyle = '#9ea592'; x.fillText(`${tierCount(set, k)} 種`, 488, y - 2);
+    });
+    const R = rng(5);
+    x.fillStyle = '#e9eee0'; rr(x, 190, 790, 220, 84, 8); x.fill();
+    x.fillStyle = '#0b0c09';
+    for (let px = 204; px < 396;) { const w = 2 + Math.floor(R() * 4); if (R() > 0.35) x.fillRect(px, 802, w, 48); px += w + 2; }
+    x.font = `600 13px ${FM}`; x.textAlign = 'center'; x.fillText('4 711234 270270', 300, 866);
+    x.fillStyle = '#9ea592'; x.font = `400 18px ${FB}`; x.fillText('展示用頁面，不涉及付款', 300, 914);
+    return cv;
+  }
+
+  const faceURLs = {};
+  function faceURL(c) {
+    if (!faceURLs[c.id]) faceURLs[c.id] = drawCardFace(c).then(cv => new Promise(res => {
+      try { cv.toBlob(b => res(b ? URL.createObjectURL(b) : cv.toDataURL('image/jpeg', 0.9)), 'image/jpeg', 0.9); } catch (e) { res(''); }
+    }));
+    return faceURLs[c.id];
+  }
+  window.__noxDraw = { drawCardFace, drawCardBack, drawPackFront, drawPackBack, CARDS, PACKS, TIERS, SETS, loadArt, fontsReady };
+
+  // ───────── HTML cards ─────────
+  function cardEl(c) {
+    const T = TIERS[c.tier], A = ATTR[c.attr];
+    const el = document.createElement('article');
+    el.className = `card t-${c.tier}`;
+    el.dataset.id = c.id;
+    el.setAttribute('role', 'img');
+    el.setAttribute('aria-label', `${c.name}，${c.basic ? '基本資源' : T.code + ' ' + T.label}，${kindLabel(c)}`);
+    el.innerHTML = '<img alt=""><div class="shine"></div><div class="glare"></div>';
+    const img = el.querySelector('img');
+    faceURL(c).then(u => { if (!u) return; img.onload = () => img.classList.add('ready'); img.src = u; });
+    tilt(el);
+    return el;
+  }
+  function tilt(el) {
+    const move = e => {
+      const r = el.getBoundingClientRect();
+      const x = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+      const y = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+      const k = reduce ? 0.3 : 1;
+      el.style.setProperty('--ry', ((x - 0.5) * 22 * k).toFixed(2) + 'deg');
+      el.style.setProperty('--rx', ((0.5 - y) * 22 * k).toFixed(2) + 'deg');
+      ['--mx', '--px'].forEach(p => el.style.setProperty(p, (x * 100).toFixed(1) + '%'));
+      ['--my', '--py'].forEach(p => el.style.setProperty(p, (y * 100).toFixed(1) + '%'));
+      el.style.setProperty('--sx', (x * 30).toFixed(1) + 'px');
+      el.style.setProperty('--sy', (y * 30).toFixed(1) + 'px');
+    };
+    const reset = () => ['--rx', '--ry', '--mx', '--my', '--px', '--py', '--sx', '--sy'].forEach(p => el.style.removeProperty(p));
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerleave', reset);
+    el.addEventListener('pointercancel', reset);
+  }
+
+  // ───────── Side panel, dex, modal, tabs ─────────
+  [CARDS[26], CARDS[49], CARDS[86]].forEach(c => $('chase').appendChild(cardEl(c)));
+  $('chase').addEventListener('click', e => { const el = e.target.closest('.card'); if (el) openModal(CARDS[el.dataset.id - 1]); });
+  $('tier-list').insertAdjacentHTML('beforeend', TIER_ORDER.map(k => {
+    const T = TIERS[k];
+    const sty = k === 'SEC' ? ` style="background:${RAINBOW_CSS};-webkit-background-clip:text;background-clip:text;color:transparent"` : '';
+    return `<div class="tier-row" style="--tc:${T.col}"><b${sty}>${T.code}</b><span>${T.label}${T.full ? '・全圖卡' : ''}</span><span>${T.n} 種</span></div>`;
+  }).join(''));
+  Object.keys(S.owned).forEach(k => { if (+k > CARDS.length) delete S.owned[k]; });
+  // basic resources are always owned (the owner's two gifted SEC cards are granted by the account module)
+  function grantSec() { CARDS.filter(c => c.basic).forEach(c => { if (!(S.owned[c.id] > 0)) S.owned[c.id] = 1; }); saveLocal(); }
+  grantSec();
+  function ownedCount() { return Object.keys(S.owned).filter(k => S.owned[k] > 0).length; }
+  function refreshStats() {
+    $('st-packs').textContent = S.packs;
+    $('st-owned').textContent = ownedCount();
+    $('tab-count').textContent = ownedCount() + '/' + ALL;
+  }
+  function renderDex() {
+    const grid = $('dex-grid'); grid.innerHTML = '';
+    let owned = 0;
+    const per = {}; TIER_ORDER.forEach(k => per[k] = [0, 0]);
+    [1, 2, 3, 0].forEach(st => {
+      const list = CARDS.filter(c => c.set === st);
+      const have = list.filter(c => S.owned[c.id] > 0).length;
+      const h = document.createElement('h3'); h.className = 'dex-set' + (st === 0 ? ' basic' : '');
+      h.innerHTML = `<span>${SETS[st].label}</span>${SETS[st].name}<em>${have} / ${list.length}</em>`;
+      grid.appendChild(h);
+      list.forEach(c => {
+        const n = S.owned[c.id] || 0, T = TIERS[c.tier];
+        if (per[c.tier]) per[c.tier][1]++;
+        const slot = document.createElement('div'); slot.className = 'slot';
+        if (n > 0) {
+          owned++; if (per[c.tier]) per[c.tier][0]++;
+          slot.appendChild(cardEl(c));
+          if (n > 1) { const q = document.createElement('span'); q.className = 'qty'; q.textContent = '×' + n; slot.appendChild(q); }
+        } else {
+          slot.innerHTML = `<div class="locked" style="--tc:${T.col}" aria-label="尚未收集：No.${c.no}"><span class="num">No.${c.no}</span><span class="q">?</span><span class="r">${T.code}</span></div>`;
+        }
+        grid.appendChild(slot);
+      });
+    });
+    $('dex-sub').textContent = owned === ALL ? `${ALL} 種全部收集完成，NOXCAT 們為你鼓掌。` : `已收集 ${owned} / ${ALL} 種，開了 ${S.packs} 包。`;
+    $('dex-bar').style.width = (owned / ALL * 100).toFixed(1) + '%';
+    $('rar-chips').innerHTML = TIER_ORDER.map(k => `<span class="rar-chip" style="--tc:${TIERS[k].col}"><em>${k}</em>${TIERS[k].label} <b>${per[k][0]}/${per[k][1]}</b></span>`).join('');
+  }
+  $('dex-grid').addEventListener('click', e => { const el = e.target.closest('.card'); if (el) openModal(CARDS[el.dataset.id - 1]); });
+  let resetArm = 0;
+  $('btn-reset').addEventListener('click', e => {
+    const b = e.currentTarget;
+    if (!resetArm) { b.textContent = '再按一次確認清空'; resetArm = setTimeout(() => { b.textContent = '清空收藏'; resetArm = 0; }, 3000); return; }
+    clearTimeout(resetArm); resetArm = 0;
+    S = { owned: {}, packs: 0, cover: S.cover }; grantSec();
+    b.textContent = '已清空'; setTimeout(() => { b.textContent = '清空收藏'; }, 1500);
+    refreshStats(); renderDex(); dexDirty = false;
+  });
+  let onTabOpen = () => {};
+  function setTab(t) {
+    const el = document.getElementById(t === 'dex' ? 'dex' : 'open');
+    if (el) el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth' });
+  }
+  const modal = $('modal');
+  let lastFocus = null;
+  function openModal(c) {
+    lastFocus = document.activeElement;
+    const box = $('modal-card'); box.innerHTML = '';
+    box.appendChild(cardEl(c));
+    if (window.NOXMARKET) window.NOXMARKET.modalExtra(c, $('modal-extra')); else $('modal-extra').innerHTML = '';
+    modal.hidden = false;
+    $('modal-close').focus();
+  }
+  function closeModal() { modal.hidden = true; if (lastFocus && lastFocus.focus) lastFocus.focus({ preventScroll: true }); }
+  $('modal-close').addEventListener('click', closeModal);
+  modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+  addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.hidden) closeModal(); });
+  refreshStats();
+  let dexDirty = true;
+  new IntersectionObserver(es => { if (es[0].isIntersecting && dexDirty) { renderDex(); dexDirty = false; } }, { rootMargin: '200px' }).observe($('view-dex'));
+  // battle page opens in a full-screen frame (same site, so it reads this collection)
+  const bov = $('battle-ov'), bfr = $('battle-frame');
+  function openBattle(e) {
+    if (e) e.preventDefault();
+    bfr.src = 'battle.html?t=' + Date.now();
+    bov.hidden = false; document.documentElement.style.overflow = 'hidden';
+  }
+  function closeBattle() { window.NOXNET.leaveAll(); bov.hidden = true; bfr.src = 'about:blank'; document.documentElement.style.overflow = ''; refreshStats(); dexDirty = true; }
+  // Online battles: platform capabilities reach only this page (the one the viewer frames), so the battle
+  // frame borrows the room through this bridge. Data is re-created here so the platform sees plain local objects.
+  window.NOXNET = (() => {
+    const rooms = new Set();
+    const ready = (async () => {
+      try { return window.claude && typeof window.claude.use === 'function' ? await window.claude.use('room') : null; } catch (e) { return null; }
+    })();
+    const clone = d => d === undefined ? undefined : JSON.parse(JSON.stringify(d));
+    const safe = h => (...x) => { try { h(...x); } catch (e) {} };
+    return {
+      ready,
+      async join(name) {
+        const r = await ready;
+        if (!r) throw Object.assign(new Error('room unavailable'), { code: 'unavailable' });
+        const nr = await r.join(String(name));
+        rooms.add(nr);
+        return {
+          name: nr.name,
+          emit: (t, d) => nr.emit(String(t), clone(d)),
+          presence: p => nr.presence(clone(p)),
+          on: (t, h, err) => nr.on(String(t), safe(h), err && safe(err)),
+          onPeers: (h, err) => nr.onPeers(safe(h), err && safe(err)),
+          onConnection: (h, err) => nr.onConnection(safe(h), err && safe(err)),
+          peers: () => nr.peers(),
+          connected: () => nr.connected(),
+          leave: () => { rooms.delete(nr); return nr.leave(); }
+        };
+      },
+      leaveAll() { rooms.forEach(nr => nr.leave().catch(() => {})); rooms.clear(); }
+    };
+  })();
+  document.querySelectorAll('.js-battle').forEach(a => a.addEventListener('click', openBattle));
+  addEventListener('message', e => { if (e.data && e.data.type === 'nox-battle-close') closeBattle(); });
+  // weakness / resistance chart in the rules section
+  const tdot = t => `<i class="tdot" style="--tc:${TYPE[t].c}">${TYPE[t].n}</i>`;
+  $('type-table').innerHTML = TYPE_ORDER.map(t => `<div class="type-row"><b>${tdot(t)}${TYPE[t].name}</b><span>被剋制 ${tdot(WEAK[t])} ×2</span><span>抵抗 ${tdot(RESIST[t])} −30（一階以上）</span></div>`).join('');
+
+  // ───────── Five packs at once ─────────
+  const multi = $('multi');
+  let backURL = '', multiBusy = false, multiFocus = null;
+  async function pullFive() {
+    if (multiBusy) return;
+    if (window.NOXACCT && !window.NOXACCT.spend(5)) return;
+    multiBusy = true;
+    if (multi.hidden) multiFocus = document.activeElement;
+    const st = coverSet(), cover = PACKS.find(p => p.id === S.cover) || PACKS[0];
+    const packs = Array.from({ length: 5 }, () => pullPack(st));
+    const all = packs.flat();
+    const seen = new Set(Object.keys(S.owned).filter(k => S.owned[k] > 0).map(Number));
+    const isNew = all.map(c => { if (seen.has(c.id)) return false; seen.add(c.id); return true; });
+    all.forEach(c => S.owned[c.id] = (S.owned[c.id] || 0) + 1);
+    S.packs += 5; save(); refreshStats(); renderDex(); dexDirty = false;
+
+    if (!backURL) { try { await fontsReady; } catch (e) {} try { backURL = drawCardBack().toDataURL('image/jpeg', 0.85); } catch (e) {} }
+    const best = all.reduce((a, c) => TIERS[c.tier].rank > TIERS[a.tier].rank ? c : a, all[0]);
+    const nNew = isNew.filter(Boolean).length;
+    $('multi-pill').textContent = `五連抽・${SETS[st].label}「${cover.label}」`;
+    $('multi-title').textContent = '洗牌中…';
+    $('multi-sub').textContent = '';
+    $('multi-chips').innerHTML = '';
+    const box = $('multi-packs'); box.innerHTML = '';
+    const slots = [];
+    packs.forEach((pk, pi) => {
+      const sec = document.createElement('section'); sec.className = 'mpack';
+      sec.innerHTML = `<h3>第 ${pi + 1} 包</h3>`;
+      const row = document.createElement('div'); row.className = 'mrow';
+      pk.forEach((c, ci) => {
+        const T = TIERS[c.tier];
+        const slot = document.createElement('div');
+        slot.className = `mslot t-${c.tier}` + (T.rank >= 2 ? ' glow' : '');
+        slot.style.setProperty('--tc', TIERS[c.tier].col);
+        slot.innerHTML = `<div class="flip"><div class="face back"${backURL ? ` style="background-image:url(${backURL})"` : ''}></div><div class="face front"></div></div>` + (isNew[pi * 5 + ci] ? '<span class="mnew">NEW</span>' : '');
+        slot.querySelector('.front').appendChild(cardEl(c));
+        row.appendChild(slot); slots.push({ slot, c });
+      });
+      sec.appendChild(row); box.appendChild(sec);
+    });
+    multi.hidden = false; multi.scrollTop = 0;
+    document.documentElement.style.overflow = 'hidden';
+    $('multi-close').focus({ preventScroll: true });
+
+    // wait until faces are drawn so nothing flips over blank
+    const uniq = [...new Set(all.map(c => c.id))].map(id => CARDS[id - 1]);
+    await Promise.race([Promise.all(uniq.map(faceURL)), new Promise(r => setTimeout(r, 2500))]);
+    const T = TIERS[best.tier];
+    const h = $('multi-title');
+    h.style.setProperty('--best', best.tier === 'N' ? 'var(--lime)' : TIERS[best.tier].col);
+    h.innerHTML = `最好的是 ${T.code}「<span></span>」`; h.querySelector("span").textContent = best.name;
+    $('multi-sub').textContent = `5 包共 25 張` + (nNew ? `，新增 ${nNew} 種到圖鑑` : '，這次沒有新卡') + `。點卡片可以放大。`;
+    $('multi-chips').innerHTML = TIER_ORDER.slice().reverse().map(k => {
+      const n = all.filter(c => c.tier === k).length;
+      return n ? `<span style="--tc:${TIERS[k].col}"><em>${k}</em>×${n}</span>` : '';
+    }).join('');
+    let t = 0;
+    slots.forEach(({ slot, c }, i) => {
+      const rare = TIERS[c.tier].rank >= 3;
+      t += i % 5 === 0 && i ? 260 : 80;
+      if (rare) t += 220;
+      if (reduce) slot.classList.add('on'); else setTimeout(() => slot.classList.add('on'), t);
+    });
+    setTimeout(() => { multiBusy = false; }, reduce ? 0 : Math.min(t, 1500));
+  }
+  function closeMulti() {
+    multi.hidden = true;
+    document.documentElement.style.overflow = '';
+    $('multi-packs').innerHTML = '';
+    if (multiFocus && multiFocus.focus) multiFocus.focus({ preventScroll: true });
+  }
+  document.querySelectorAll('.js-five').forEach(b => b.addEventListener('click', pullFive));
+  $('multi-again').addEventListener('click', pullFive);
+  $('multi-close').addEventListener('click', closeMulti);
+  $('multi-dex').addEventListener('click', () => { closeMulti(); setTab('dex'); });
+  $('multi-packs').addEventListener('click', e => { const el = e.target.closest('.mslot.on .card'); if (el) openModal(CARDS[el.dataset.id - 1]); });
+  addEventListener('keydown', e => { if (e.key === 'Escape' && !multi.hidden && modal.hidden) closeMulti(); }, true);
+
+  function pickTier(slot) {
+    const r = Math.random() * 100;
+    if (slot < 3) return r < 15 ? 'R' : 'N';
+    if (slot === 3) return r < 0.5 ? 'SEC' : r < 3 ? 'UR' : r < 13 ? 'SSR' : r < 38 ? 'SR' : 'R';
+    return r < 0.6 ? 'SEC' : r < 3 ? 'UR' : r < 12 ? 'SSR' : r < 30 ? 'SR' : r < 60 ? 'R' : 'N';
+  }
+  const coverSet = () => (PACKS.find(p => p.id === S.cover) || PACKS[0]).set;
+  function pullPack(st) {
+    st = st || coverSet();
+    const out = [];
+    for (let i = 0; i < 5; i++) { const pool = POOL[st][pickTier(i)]; out.push(pool[Math.floor(Math.random() * pool.length)]); }
+    return out.sort((a, b) => TIERS[a.tier].rank - TIERS[b.tier].rank);
+  }
+  $('covers').innerHTML = [1, 2, 3].map(st => `<span class="cover-set">${SETS[st].label}</span>` + PACKS.filter(p => p.set === st).map(p => `<button type="button" id="cover-${p.id}" data-cover="${p.id}" aria-pressed="${p.id === S.cover}"><i style="background:${p.rainbow ? RAINBOW_CSS : p.accent}"></i>${p.label}</button>`).join('')).join('<span class="cover-sep" aria-hidden="true"></span>');
+
+  // ───────── 3D stage ─────────
+  const stage = $('stage'), canvas = $('gl');
+  function fail(msg) {
+    $('loading').hidden = true;
+    ['hud-pack', 'hud-pack-top', 'hud-reveal', 'hud-summary', 'hud-summary-top'].forEach(id => $(id).hidden = true);
+    const d = document.createElement('div'); d.className = 'fallback'; d.textContent = msg; stage.appendChild(d);
+  }
+  // shared with market.js (wallet + market)
+  window.NOXCORE = {
+    get S() { return S; }, saveLocal, refreshStats, faceURL, cardEl, closeModal,
+    dexChanged() { dexDirty = true; if ($('view-dex').getBoundingClientRect().top < innerHeight + 200) { renderDex(); dexDirty = false; } },
+    CARDS, TIERS, TIER_ORDER, SETS, TYPE, TYPE_ORDER
+  };
+  if (typeof THREE === 'undefined') { fail('3D 程式庫沒有載入成功，請重新整理頁面再試一次。'); return; }
+  let renderer = null;
+  try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true }); } catch (e) {}
+  if (!renderer) { fail('這個瀏覽器無法啟用 WebGL，看不到 3D 開卡動畫。請換一個瀏覽器或開啟硬體加速。'); return; }
+
+  const SP = reduce ? 0.35 : 1;
+  let PR = Math.min(window.devicePixelRatio || 1, 1.75);
+  renderer.setPixelRatio(PR);
+  renderer.setClearColor(0x000000, 0);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 100);
+  const MAXANI = renderer.capabilities.getMaxAnisotropy();
+  {
+    const env = new THREE.Scene();
+    env.add(new THREE.Mesh(new THREE.BoxGeometry(20, 20, 20), new THREE.MeshBasicMaterial({ color: 0x0d0f0a, side: THREE.BackSide })));
+    const panel = (color, w, h, pos) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide })); m.position.set(...pos); m.lookAt(0, 0, 0); env.add(m); };
+    panel(0xffffff, 8, 3, [0, 7, 4]); panel(0xb4f01e, 3, 9, [-8, 0, 3]); panel(0xfff0d0, 3, 9, [8, 1, 2]); panel(0x8b7dff, 9, 3, [0, -6, -4]);
+    const pm = new THREE.PMREMGenerator(renderer);
+    scene.environment = pm.fromScene(env, 0.04).texture;
+    pm.dispose();
+  }
+  scene.add(new THREE.HemisphereLight(0xf4ffe0, 0x14200a, 0.6));
+  const key = new THREE.DirectionalLight(0xffffff, 0.85);
+  key.position.set(2.2, 4.5, 6);
+  key.castShadow = true;
+  key.shadow.mapSize.set(1024, 1024);
+  Object.assign(key.shadow.camera, { left: -5, right: 5, top: 5, bottom: -5, near: 1, far: 20 });
+  key.shadow.camera.updateProjectionMatrix();
+  key.shadow.bias = -0.0005;
+  scene.add(key);
+  const rim = new THREE.PointLight(0xb4f01e, 1.2, 12, 2);
+  rim.position.set(-2.8, 1.8, -2);
+  scene.add(rim);
+
+  function canvasTex(cv) { const t = new THREE.CanvasTexture(cv); t.anisotropy = MAXANI; return t; }
+  const glowTex = (() => {
+    const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d');
+    const g = x.createRadialGradient(64, 64, 0, 64, 64, 64); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.25, 'rgba(255,255,255,.55)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = g; x.fillRect(0, 0, 128, 128); return new THREE.CanvasTexture(c);
+  })();
+  const rayTex = (() => {
+    const c = document.createElement('canvas'); c.width = 64; c.height = 256; const x = c.getContext('2d');
+    const g = x.createLinearGradient(0, 256, 0, 0); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = g; x.fillRect(0, 0, 64, 256);
+    x.globalCompositeOperation = 'destination-in';
+    const h = x.createLinearGradient(0, 0, 64, 0); h.addColorStop(0, 'rgba(0,0,0,0)'); h.addColorStop(0.5, 'rgba(0,0,0,1)'); h.addColorStop(1, 'rgba(0,0,0,0)');
+    x.fillStyle = h; x.fillRect(0, 0, 64, 256);
+    return new THREE.CanvasTexture(c);
+  })();
+  const additive = (map, color, opacity) => new THREE.MeshBasicMaterial({ map, color, transparent: true, opacity, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 30).rotateX(-Math.PI / 2), new THREE.ShadowMaterial({ opacity: 0.38 }));
+  floor.receiveShadow = true; scene.add(floor);
+  const spot = new THREE.Mesh(new THREE.PlaneGeometry(7, 7).rotateX(-Math.PI / 2), additive(glowTex, 0xb4f01e, 0.22));
+  scene.add(spot);
+  const dust = (() => {
+    const N = 140, pos = new Float32Array(N * 3);
+    for (let i = 0; i < N; i++) { pos[i * 3] = (Math.random() - 0.5) * 9; pos[i * 3 + 1] = (Math.random() - 0.5) * 6; pos[i * 3 + 2] = (Math.random() - 0.5) * 4 - 1; }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const p = new THREE.Points(g, new THREE.PointsMaterial({ size: 0.04, map: glowTex, color: 0xcfff70, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending }));
+    scene.add(p); return p;
+  })();
+  function makeRays(n, len) {
+    const g = new THREE.Group();
+    for (let i = 0; i < n; i++) {
+      const geo = new THREE.PlaneGeometry(0.32, len); geo.translate(0, len / 2, 0);
+      const m = new THREE.Mesh(geo, additive(rayTex, 0xffffff, 0));
+      m.rotation.z = (i / (n - 1) - 0.5) * 2.0 + (Math.random() - 0.5) * 0.15;
+      m.userData.base = m.rotation.z; m.userData.ph = Math.random() * 6;
+      g.add(m);
+    }
+    g.visible = false;
+    return g;
+  }
+  const setRays = (g, color, op) => g.children.forEach(m => { m.material.color.set(color); m.material.opacity = op; });
+
+  const PACK_W = 1.5, PACK_H = 2.4, SEAM_F = SEAM / PH;
+  const bodyH = PACK_H * (1 - SEAM_F), topH = PACK_H * SEAM_F;
+  const seamY = PACK_H / 2 - topH;
+  function packGeo(h, vFrom, vTo, puff) {
+    const g = new THREE.PlaneGeometry(PACK_W, h, 24, 32);
+    const p = g.attributes.position, uv = g.attributes.uv;
+    for (let i = 0; i < p.count; i++) {
+      const u = uv.getX(i), v = uv.getY(i);
+      p.setZ(i, puff * Math.pow(Math.sin(Math.PI * u), 0.55) * Math.pow(Math.sin(Math.PI * v), 0.35));
+      uv.setY(i, vFrom + v * (vTo - vFrom));
+    }
+    g.computeVertexNormals();
+    return g;
+  }
+  const mkPackMat = () => new THREE.MeshStandardMaterial({ color: 0x222820, metalness: 0.3, roughness: 0.38 });
+  const packMats = { front: mkPackMat(), back: mkPackMat() };
+  const stripMats = { front: mkPackMat(), back: mkPackMat() };
+  const allPackMats = [packMats.front, packMats.back, stripMats.front, stripMats.back];
+  const packG = new THREE.Group();
+  scene.add(packG);
+  const bodyGeo = packGeo(bodyH, 0, 1 - SEAM_F, 0.1);
+  const bodyF = new THREE.Mesh(bodyGeo, packMats.front); bodyF.position.y = -topH / 2;
+  const bodyB = new THREE.Mesh(bodyGeo, packMats.back); bodyB.position.y = -topH / 2; bodyB.rotation.y = Math.PI;
+  [bodyF, bodyB].forEach(m => { m.castShadow = true; packG.add(m); });
+  const topPivot = new THREE.Group(); topPivot.position.set(-PACK_W / 2, seamY, 0); packG.add(topPivot);
+  const stripGeo = packGeo(topH, 1 - SEAM_F, 1, 0.025);
+  const stripF = new THREE.Mesh(stripGeo, stripMats.front); stripF.position.set(PACK_W / 2, topH / 2, 0);
+  const stripB = new THREE.Mesh(stripGeo, stripMats.back); stripB.position.set(PACK_W / 2, topH / 2, 0); stripB.rotation.y = Math.PI;
+  [stripF, stripB].forEach(m => { m.castShadow = true; topPivot.add(m); });
+  const seamGeo = new THREE.PlaneGeometry(1, 0.028); seamGeo.translate(0.5, 0, 0);
+  const seam = new THREE.Mesh(seamGeo, new THREE.MeshBasicMaterial({ color: 0xeaffb0, transparent: true, opacity: 0.95, depthWrite: false, blending: THREE.AdditiveBlending }));
+  seam.position.set(-PACK_W / 2 + 0.04, seamY, 0.03); seam.scale.x = 0.0001; packG.add(seam);
+  const seamGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xb4f01e, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
+  seamGlow.scale.set(0.5, 0.5, 1); packG.add(seamGlow);
+  const innerGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
+  innerGlow.position.set(0, seamY + 0.15, 0.05); packG.add(innerGlow);
+  const innerLight = new THREE.PointLight(0xffffff, 0, 6, 2); innerLight.position.set(0, seamY + 0.3, 0.4); packG.add(innerLight);
+  const packRays = makeRays(9, 3.4); packRays.position.set(0, seamY - 0.05, -0.06); packG.add(packRays);
+  const cardRays = makeRays(12, 3.0); scene.add(cardRays);
+
+  const CARD_W = 1.26, CARD_H = 1.76;
+  function roundedRect(w, h, r) {
+    const s = new THREE.Shape(), x = -w / 2, y = -h / 2;
+    s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r);
+    s.lineTo(x + w, y + h - r); s.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    s.lineTo(x + r, y + h); s.quadraticCurveTo(x, y + h, x, y + h - r);
+    s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y);
+    return s;
+  }
+  const cardShape = roundedRect(CARD_W, CARD_H, 0.063);
+  const faceGeo = new THREE.ShapeGeometry(cardShape, 8);
+  { const p = faceGeo.attributes.position, uv = faceGeo.attributes.uv; for (let i = 0; i < p.count; i++) uv.setXY(i, (p.getX(i) + CARD_W / 2) / CARD_W, (p.getY(i) + CARD_H / 2) / CARD_H); }
+  const edgeGeo = new THREE.ExtrudeGeometry(cardShape, { depth: 0.009, bevelEnabled: false, curveSegments: 8 });
+  edgeGeo.translate(0, 0, -0.0045);
+  const hiddenMat = new THREE.MeshBasicMaterial({ visible: false });
+  const backMat = new THREE.MeshStandardMaterial({ map: canvasTex(drawCardBack()), metalness: 0.25, roughness: 0.45, transparent: true, alphaTest: 0.5 });
+  fontsReady.then(() => { const t = backMat.map; backMat.map = canvasTex(drawCardBack()); backMat.needsUpdate = true; t.dispose(); });
+  const blankTex = new THREE.DataTexture(new Uint8Array([18, 20, 16, 255]), 1, 1, THREE.RGBAFormat); blankTex.needsUpdate = true;
+  const CARD_VS = `varying vec2 vUv; varying vec3 vPos; void main(){ vUv = uv; vPos = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }`;
+  const CARD_FS = `
+    uniform sampler2D map; uniform float uMode, uFull, uTime; uniform vec3 uCam; uniform vec2 uArt;
+    varying vec2 vUv; varying vec3 vPos;
+    vec3 hue(float h){ return clamp(abs(mod(h*6. + vec3(0.,4.,2.), 6.) - 3.) - 1., 0., 1.); }
+    float hash(vec2 p){ return fract(sin(dot(p, vec2(41.3,289.1))) * 45758.5453); }
+    void main(){
+      vec4 tex = texture2D(map, vUv);
+      if (tex.a < .5) discard;
+      vec3 col = tex.rgb;
+      vec3 V = normalize(uCam - vPos);
+      vec3 L = normalize(vec3(.35,.55,1.));
+      vec3 H = normalize(L + V);
+      float spec = pow(max(H.z, 0.), 70.);
+      float ang = V.x*1.6 + V.y*1.2;
+      float art = uFull > .5 ? 1. : step(.0567,vUv.x)*step(vUv.x,.9433)*step(uArt.x,vUv.y)*step(vUv.y,uArt.y);
+      float iu = uFull > .5 ? .0233 : .03, iv = uFull > .5 ? .0167 : .0215;
+      float rim = 1. - step(iu,vUv.x)*step(vUv.x,1.-iu)*step(iv,vUv.y)*step(vUv.y,1.-iv);
+      float band = smoothstep(.24,0.,abs(fract(vUv.y*.8 + vUv.x*.3 + ang) - .5));
+      vec2 cell = floor(vUv*vec2(70.,98.)); float h = hash(cell);
+      float spark = step(.972,h) * (.5 + .5*sin(uTime*5. + h*60.));
+      vec3 rb = hue(fract(vUv.x*.7 + vUv.y*.5 + ang*.9));
+      float st = .65 + .35*sin((vUv.x - vUv.y)*140.);
+      if (uMode > .5 && uMode < 1.5) col += vec3(.95)*band*(rim*.5 + art*.08);
+      if (uMode > 1.5 && uMode < 2.5) col += rb*(art*.3 + rim*.5)*st;
+      if (uMode > 2.5 && uMode < 3.5) { float b = smoothstep(.3,0.,abs(fract(vUv.x*.6 - vUv.y*.45 + ang*.8) - .5)); col += vec3(1.,.8,.38)*b*(art*.36 + rim*.6) + spark*art*vec3(1.,.95,.75)*1.2; }
+      if (uMode > 3.5 && uMode < 4.5) col += rb*(art*.14 + rim*.5) + vec3(.85,.97,1.)*band*art*.18 + spark*vec3(.85,.97,1.)*1.5;
+      if (uMode > 4.5) col += rb*(art*.32 + rim*.6)*st + spark*vec3(1.)*1.3;
+      col *= .92 + .16*L.z;
+      col += spec*.3;
+      gl_FragColor = vec4(col, 1.);
+    }`;
+  // art window in texture space (the art height changes with how much text a card has)
+  const artUV = c => new THREE.Vector2(1 - (110 + (c._ah || 392)) / 838, 1 - 110 / 838);
+  function makeCard3D(c) {
+    const g = new THREE.Group();
+    const T = TIERS[c.tier];
+    const mat = new THREE.ShaderMaterial({
+      uniforms: { map: { value: blankTex }, uMode: { value: T.rank }, uFull: { value: T.full ? 1 : 0 }, uTime: { value: 0 }, uCam: { value: new THREE.Vector3(0, 0, 5) }, uArt: { value: artUV(c) } },
+      vertexShader: CARD_VS, fragmentShader: CARD_FS
+    });
+    const front = new THREE.Mesh(faceGeo, mat); front.position.z = 0.0046; front.castShadow = true;
+    const back = new THREE.Mesh(faceGeo, backMat); back.position.z = -0.0046; back.rotation.y = Math.PI; back.castShadow = true;
+    const edge = new THREE.Mesh(edgeGeo, [hiddenMat, new THREE.MeshStandardMaterial({ color: T.edge, metalness: 0.6, roughness: 0.3 })]);
+    g.add(front, back, edge);
+    g.userData = { card: c, front, up: false, pose: { p: new THREE.Vector3(), r: new THREE.Vector3(0, Math.PI, 0), s: 1 }, x: { tx: 0, ty: 0, lift: 0 } };
+    return g;
+  }
+  function disposeCard(g) {
+    const m = g.userData.front.material;
+    if (m.uniforms.map.value !== blankTex) m.uniforms.map.value.dispose();
+    m.dispose(); g.children[2].material[1].dispose();
+  }
+
+  const BN = 260;
+  const bPos = new Float32Array(BN * 3), bVel = new Float32Array(BN * 3), bCol = new Float32Array(BN * 3);
+  const bGeo = new THREE.BufferGeometry();
+  bGeo.setAttribute('position', new THREE.BufferAttribute(bPos, 3));
+  bGeo.setAttribute('color', new THREE.BufferAttribute(bCol, 3));
+  const bMat = new THREE.PointsMaterial({ size: 0.11, map: glowTex, vertexColors: true, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
+  const bPts = new THREE.Points(bGeo, bMat); bPts.frustumCulled = false; scene.add(bPts);
+  const flash = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
+  scene.add(flash);
+  let bLife = 0;
+  const tmpC = new THREE.Color();
+  function burst(pos, color, power, multi) {
+    if (reduce) return;
+    for (let i = 0; i < BN; i++) {
+      const u = Math.random() * 2 - 1, th = Math.random() * Math.PI * 2, s = Math.sqrt(1 - u * u);
+      const sp = (1.2 + Math.random() * 2.6) * power;
+      bPos[i * 3] = pos.x; bPos[i * 3 + 1] = pos.y; bPos[i * 3 + 2] = pos.z;
+      bVel[i * 3] = Math.cos(th) * s * sp; bVel[i * 3 + 1] = u * sp + 0.6; bVel[i * 3 + 2] = Math.sin(th) * s * sp * 0.5 + 1.2;
+      if (multi) tmpC.setHSL(Math.random(), 1, 0.65); else tmpC.set(color);
+      bCol[i * 3] = tmpC.r; bCol[i * 3 + 1] = tmpC.g; bCol[i * 3 + 2] = tmpC.b;
+    }
+    bGeo.attributes.position.needsUpdate = true; bGeo.attributes.color.needsUpdate = true;
+    bLife = 1;
+    flash.material.color.set(multi ? '#ffffff' : color); flash.position.copy(pos).add(new THREE.Vector3(0, 0, 0.2)); flash.scale.setScalar(0.5); flash.material.opacity = 1;
+  }
+  const aura = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
+  scene.add(aura);
+
+  // texture warm-up: draw each new texture once on a hidden speck so the GPU upload never lands mid-animation
+  const uploadQueue = [];
+  const uploader = new THREE.Mesh(new THREE.PlaneGeometry(0.002, 0.002), new THREE.MeshBasicMaterial({ map: blankTex, transparent: true, opacity: 0.004, depthWrite: false }));
+  uploader.position.set(0, 0, -0.5); scene.add(uploader);
+  const idle = () => new Promise(r => (window.requestIdleCallback ? requestIdleCallback(() => r(), { timeout: 500 }) : setTimeout(r, 40)));
+  let next = null;
+  function prepareNext() {
+    const job = { pulls: pullPack(), tex: [], cvs: [] };
+    job.done = (async () => {
+      for (let i = 0; i < 5; i++) {
+        await idle();
+        const cv = await drawCardFace(job.pulls[i]);
+        job.cvs[i] = cv; job.tex[i] = canvasTex(cv); uploadQueue.push(job.tex[i]);
+      }
+    })();
+    next = job;
+    return job;
+  }
+  function cacheFaces(job) {
+    job.pulls.forEach((c, i) => {
+      const cv = job.cvs[i];
+      if (!cv || faceURLs[c.id]) return;
+      faceURLs[c.id] = idle().then(() => new Promise(res => { try { cv.toBlob(b => res(b ? URL.createObjectURL(b) : ''), 'image/jpeg', 0.9); } catch (e) { res(''); } }));
+    });
+    job.cvs = [];
+  }
+
+  const tweens = new Set();
+  const ease = {
+    out: k => 1 - Math.pow(1 - k, 3),
+    inOut: k => k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2,
+    in: k => k * k * k,
+    back: k => { const c1 = 1.5, c3 = c1 + 1; return 1 + c3 * Math.pow(k - 1, 3) + c1 * Math.pow(k - 1, 2); }
+  };
+  function tween(dur, fn, e = ease.inOut) {
+    return new Promise(res => {
+      const d = dur * SP * 1000;
+      if (d <= 0) { fn(1); res(); return; }
+      tweens.add({ t0: performance.now(), d, fn, e, res });
+    });
+  }
+  const wait = s => tween(s, () => {});
+  const lerp = (a, b, k) => a + (b - a) * k;
+  function poseTo(g, to, dur, e) {
+    const P = g.userData.pose, fp = P.p.clone(), fr = P.r.clone(), fs = P.s;
+    return tween(dur, k => { P.p.lerpVectors(fp, to.p, k); P.r.set(lerp(fr.x, to.r.x, k), lerp(fr.y, to.r.y, k), lerp(fr.z, to.r.z, k)); P.s = lerp(fs, to.s, k); }, e);
+  }
+
+  const L = { visW: 4, visH: 4 };
+  function resize() {
+    const w = stage.clientWidth, h = Math.max(stage.clientHeight, 1);
+    if (!w) return;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    const t2 = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+    const dist = Math.max(4.6 / t2, 3.9 / (t2 * camera.aspect));
+    camera.position.set(0, 0.15, dist); camera.lookAt(0, 0, 0); camera.updateProjectionMatrix();
+    L.visH = dist * t2; L.visW = L.visH * camera.aspect;
+    L.packS = Math.min(L.visH * 0.54 / PACK_H, L.visW * 0.62 / PACK_W);
+    L.packY = 0.02;
+    L.stackS = Math.min(L.visH * 0.46 / CARD_H, L.visW * 0.62 / CARD_W);
+    L.stackY = L.visH * 0.07;
+    L.rowS = Math.min(0.42, (L.visW - 0.3) / 5 / CARD_W * 0.9);
+    L.rowGap = CARD_W * L.rowS * 1.1;
+    L.rowY = -L.visH / 2 + CARD_H * L.rowS / 2 + L.visH * 0.05;
+    L.sumS = Math.min(0.82, L.visH * 0.5 / CARD_H);
+    L.sumGap = Math.min(CARD_W * L.sumS * 1.06, (L.visW - CARD_W * L.sumS - 0.25) / 4);
+    L.sumY = -L.visH * 0.02;
+    floor.position.y = -L.visH * 0.44; spot.position.y = floor.position.y + 0.01;
+    relayout();
+  }
+  const stackPose = (i, top) => { const d = i - top; return { p: new THREE.Vector3(0, L.stackY - d * 0.03, -d * 0.03), r: new THREE.Vector3(0, Math.PI, d ? (d % 2 ? 0.04 : -0.03) : 0), s: L.stackS }; };
+  const rowPose = i => ({ p: new THREE.Vector3((i - 2) * L.rowGap, L.rowY, 0), r: new THREE.Vector3(0, 0, 0), s: L.rowS });
+  const fanPose = i => ({ p: new THREE.Vector3((i - 2) * L.sumGap, L.sumY - Math.pow(i - 2, 2) * 0.05, i * 0.02), r: new THREE.Vector3(0, 0, -(i - 2) * 0.05), s: L.sumS });
+  const upPose = () => ({ p: new THREE.Vector3(0, L.stackY, 0.5), r: new THREE.Vector3(0, 0, 0), s: L.stackS * 1.05 });
+  const copyPose = (g, to) => { const P = g.userData.pose; P.p.copy(to.p); P.r.copy(to.r); P.s = to.s; };
+  function relayout() {
+    packG.scale.setScalar(L.packS);
+    if (state === 'pack') packG.position.y = L.packY;
+    if (state === 'reveal') cards.forEach((g, i) => copyPose(g, i < cur ? rowPose(i) : (g.userData.up ? upPose() : stackPose(i, cur))));
+    if (state === 'summary') cards.forEach((g, i) => copyPose(g, fanPose(i)));
+  }
+
+  let state = 'loading', pulls = [], cards = [], cur = 0, newIds = new Set(), animBusy = false;
+  let tearP = 0, yawUser = 0, yawVel = 0;
+  const TCOL = { N: '#e9eee0', R: '#e6ebf2', SR: '#9fd0ff', SSR: '#ffcc45', UR: '#9ef0ff', SEC: '#ff8ae6' };
+  function ui(s) {
+    $('hud-pack').hidden = s !== 'pack';
+    $('hud-pack-top').hidden = s !== 'pack';
+    $('hud-reveal').hidden = s !== 'reveal';
+    $('hud-summary').hidden = s !== 'summary';
+    $('hud-summary-top').hidden = s !== 'summary';
+  }
+  function setTear(v) {
+    tearP = v;
+    seam.scale.x = Math.max(0.0001, v * (PACK_W - 0.08));
+    seamGlow.position.set(-PACK_W / 2 + 0.04 + v * (PACK_W - 0.08), seamY, 0.06);
+    seamGlow.material.opacity = v > 0 ? 0.9 : 0;
+    topPivot.rotation.z = v * 0.1;
+  }
+  const packTex = {}, packBackTex = {};
+  function applyCover(id) {
+    const P = PACKS.find(p => p.id === id) || PACKS[0];
+    const t = packTex[P.id];
+    if (t) [packMats.front, stripMats.front].forEach(m => { m.map = t; m.color.set(0xffffff); m.needsUpdate = true; });
+    const bt = packBackTex[P.set];
+    if (bt) [packMats.back, stripMats.back].forEach(m => { m.map = bt; m.color.set(0xffffff); m.needsUpdate = true; });
+    const c = P.rainbow ? '#c58bff' : P.accent;
+    rim.color.set(c); spot.material.color.set(c); seamGlow.material.color.set(P.rainbow ? '#ff8ae6' : P.accent);
+  }
+  async function chooseCover(id) {
+    if (state !== 'pack' || id === S.cover) return;
+    const oldSet = coverSet();
+    S.cover = id; save();
+    if (coverSet() !== oldSet && next) { const old = next; next = null; old.done.then(() => old.tex.forEach(t => t && t.dispose())); prepareNext(); }
+    document.querySelectorAll('[data-cover]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.cover === id)));
+    state = 'swapping';
+    const y0 = yawUser;
+    await tween(0.28, k => { yawUser = lerp(y0, y0 + Math.PI / 2, k); }, ease.in);
+    applyCover(id);
+    await tween(0.34, k => { yawUser = lerp(y0 - Math.PI / 2, y0, k); }, ease.out);
+    yawUser = y0;
+    state = 'pack';
+  }
+  $('covers').addEventListener('click', e => { const b = e.target.closest('[data-cover]'); if (b) chooseCover(b.dataset.cover); });
+
+  function resetPack() {
+    cards.forEach(g => { scene.remove(g); packG.remove(g); disposeCard(g); });
+    cards = []; cur = 0;
+    packG.visible = true;
+    packG.position.set(0, L.packY, 0); packG.rotation.set(0, 0, 0);
+    topPivot.position.set(-PACK_W / 2, seamY, 0); topPivot.rotation.set(0, 0, 0);
+    allPackMats.forEach(m => { m.transparent = false; m.opacity = 1; m.needsUpdate = true; });
+    seam.material.opacity = 0.95;
+    setTear(0);
+    innerGlow.material.opacity = 0; innerLight.intensity = 0; packRays.visible = false; cardRays.visible = false;
+    aura.material.opacity = 0;
+    yawUser = 0; yawVel = 0;
+    state = 'pack'; ui('pack');
+    animBusy = false; pending = false;
+    if (!next) prepareNext();
+  }
+  function packOpacity(o) { allPackMats.forEach(m => { if (!m.transparent) { m.transparent = true; m.needsUpdate = true; } m.opacity = o; }); }
+
+  let job = null;
+  async function openPack() {
+    if (state !== 'pack') return;
+    if (window.NOXACCT && !window.NOXACCT.spend(1)) { const from = tearP; tween(0.25, k => setTear(lerp(from, 0, k)), ease.out); return; }
+    state = 'opening'; ui('opening');
+    job = next || prepareNext(); next = null;
+    const myJob = job;
+    pulls = job.pulls;
+    newIds = new Set(pulls.filter(c => !S.owned[c.id]).map(c => c.id));
+    pulls.forEach(c => S.owned[c.id] = (S.owned[c.id] || 0) + 1);
+    S.packs++; save(); refreshStats(); dexDirty = true; setTimeout(() => { if (dexDirty && $('view-dex').getBoundingClientRect().top < innerHeight + 200) { renderDex(); dexDirty = false; } }, 4000);
+    const best = pulls[4].tier, bc = TCOL[best];
+    cards = pulls.map((c, i) => {
+      const g = makeCard3D(c);
+      copyPose(g, { p: new THREE.Vector3(0, -0.15, (2 - i) * 0.006), r: new THREE.Vector3(0, Math.PI, 0), s: 1 });
+      packG.add(g);
+      return g;
+    });
+    const myCards = cards;
+    myJob.done.then(() => { if (cards === myCards) myCards.forEach((g, i) => { g.userData.front.material.uniforms.map.value = myJob.tex[i]; g.userData.front.material.uniforms.uArt.value = artUV(g.userData.card); }); });
+    // 1. square up the pack and finish the seam
+    const y0 = packG.rotation.y, x0 = packG.rotation.x, t0 = tearP;
+    await tween(0.3, k => { packG.rotation.y = lerp(y0, 0, k); packG.rotation.x = lerp(x0, 0, k); setTear(lerp(t0, 1, k)); }, ease.out);
+    // 2. strip flies off while light pours out
+    stripMats.front.transparent = stripMats.back.transparent = true; stripMats.front.needsUpdate = stripMats.back.needsUpdate = true;
+    const tp = topPivot.position.clone();
+    tween(0.8, k => {
+      topPivot.position.set(tp.x + k * 1.9, tp.y + k * 1.5 - k * k * 0.5, tp.z + k * 0.9);
+      topPivot.rotation.set(k * 0.9, k * 0.4, 0.1 + k * 1.3);
+      stripMats.front.opacity = stripMats.back.opacity = 1 - k;
+      seam.material.opacity = 0.95 * (1 - k); seamGlow.material.opacity = 0.9 * (1 - k);
+    }, ease.out);
+    innerGlow.material.color.set(bc); innerLight.color.set(bc);
+    packRays.visible = true;
+    tween(0.42, k => { packG.rotation.z = Math.sin(k * Math.PI * 6) * 0.022 * (1 - k); });
+    tween(0.5, k => {
+      innerGlow.scale.setScalar(0.3 + k * 2.6); innerGlow.material.opacity = k * 0.95;
+      innerLight.intensity = k * 3.2;
+      setRays(packRays, bc, k * 0.5);
+    }, ease.out);
+    await wait(0.2);
+    // 3. each card rises out and flows straight into the stack
+    const RISE = 0.55, STAG = 0.07;
+    const rises = cards.map((g, i) => wait((4 - i) * STAG).then(async () => {
+      const P = g.userData.pose, from = P.p.y;
+      await tween(RISE, k => { P.p.y = lerp(from, seamY + 1.0, k); }, ease.out);
+      g.updateMatrixWorld(true); scene.attach(g);
+      P.p.copy(g.position); P.r.set(g.rotation.x, g.rotation.y, g.rotation.z); P.s = g.scale.x;
+      return poseTo(g, stackPose(i, 0), 0.65, ease.inOut);
+    }));
+    // 4. the empty pack drops away once the last card is out
+    wait(4 * STAG + RISE + 0.06).then(() => {
+      const py = packG.position.y;
+      packOpacity(1);
+      return tween(0.65, k => {
+        packG.position.y = py - k * 3.4; packG.rotation.x = k * 0.6;
+        packOpacity(1 - k);
+        innerGlow.material.opacity = 0.95 * (1 - k); innerLight.intensity = 3.2 * (1 - k);
+        setRays(packRays, bc, 0.5 * (1 - k));
+      }, ease.in);
+    }).then(() => { if (state !== 'pack') { packG.visible = false; packRays.visible = false; } });
+    await Promise.all(rises);
+    await myJob.done;
+    cur = 0; state = 'reveal'; ui('reveal');
+    updateRevealUI();
+  }
+  async function autoTear() {
+    if (state !== 'pack') return;
+    if (window.NOXACCT && !window.NOXACCT.canAfford(1)) return;
+    await tween(0.45, k => setTear(lerp(tearP, 1, k)), ease.out);
+    openPack();
+  }
+  const PRE = { SR: '這張卡在發光……', SSR: '金光一閃……', UR: '空氣好像結冰了……', SEC: '……顏色不太對勁？' };
+  const POST = { R: 'R 稀有', SR: 'SR 超稀有！', SSR: 'SSR 特級稀有！', UR: 'UR 究極稀有！！', SEC: 'SEC 秘藏卡出現了！！！' };
+  function updateRevealUI() {
+    const g = cards[cur];
+    $('counter').textContent = Math.min(cur + 1, 5) + ' / 5';
+    const call = $('callout');
+    if (!g) return;
+    const t = g.userData.card.tier;
+    if (!g.userData.up) { $('reveal-tip').textContent = '點一下翻開'; call.textContent = PRE[t] || ''; }
+    else { $('reveal-tip').textContent = cur === 4 ? '點一下看結果' : '點一下看下一張'; call.textContent = POST[t] || ''; }
+    call.style.setProperty('--callout', t === 'N' ? '#b4f01e' : TCOL[t]);
+  }
+  let pending = false;
+  async function advance() {
+    if (state !== 'reveal') return;
+    if (animBusy) { pending = true; return; }
+    const g = cards[cur]; if (!g) return;
+    const c = g.userData.card, T = TIERS[c.tier], rank = T.rank;
+    if (!g.userData.up) {
+      animBusy = true;
+      const P = g.userData.pose;
+      if (rank >= 2 && !reduce) {
+        const z0 = P.r.z, dur = [0, 0, 0.38, 0.55, 0.7, 0.9][rank];
+        await tween(dur, k => { P.r.z = z0 + Math.sin(k * Math.PI * 2 * (6 + rank)) * (0.02 + rank * 0.006) * (1 - k * 0.4); P.p.z = k * 0.15; }, ease.in);
+        P.r.z = z0;
+      }
+      g.userData.up = true;
+      let fired = false;
+      const to = upPose();
+      const fp = P.p.clone(), fy = P.r.y, fz = P.r.z, fs = P.s;
+      await tween(0.7, k => {
+        const m = Math.min(1, k * 1.3);
+        P.p.lerpVectors(fp, to.p, m);
+        P.r.y = lerp(fy, 0, k); P.r.z = lerp(fz, 0, k);
+        P.s = lerp(fs, to.s, m);
+        if (!fired && k > 0.45) {
+          fired = true;
+          const wp = new THREE.Vector3(0, L.stackY, 0.6);
+          if (rank === 5) burst(wp, '#ffffff', 1.5, true);
+          else if (rank === 4) burst(wp, '#bff4ff', 1.35);
+          else if (rank === 3) burst(wp, '#ffd75e', 1.2);
+          else if (rank === 2) burst(wp, '#b9dcff', 1);
+          else if (rank === 1) burst(wp, '#e9eef5', 0.5);
+          if (rank >= 3) { cardRays.visible = true; cardRays.position.set(0, L.stackY - 0.1, 0.1); }
+        }
+      }, ease.back);
+      updateRevealUI();
+      animBusy = false;
+    } else {
+      const i = cur;
+      cur++;
+      updateRevealUI();
+      cards.forEach((o, j) => { if (j >= cur && !o.userData.up) poseTo(o, stackPose(j, cur), 0.3, ease.out); });
+      const sent = poseTo(g, rowPose(i), 0.45, ease.inOut);
+      if (cur >= cards.length) { animBusy = true; await sent; animBusy = false; if (state === 'reveal') goSummary(); return; }
+    }
+    if (pending && state === 'reveal') { pending = false; advance(); }
+  }
+  async function skipAll() {
+    if (state !== 'reveal' || animBusy) return;
+    pending = false;
+    state = 'summary-prep';
+    cards.forEach(g => { g.userData.up = true; });
+    await Promise.all(cards.map((g, i) => wait(i * 0.05).then(() => poseTo(g, fanPose(i), 0.7, ease.inOut))));
+    goSummary(true);
+  }
+  const esc = t => String(t).replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
+  async function goSummary(already) {
+    state = 'summary'; ui('summary');
+    animBusy = false;
+    const best = pulls[pulls.length - 1], T = TIERS[best.tier];
+    const nNew = pulls.filter(c => newIds.has(c.id)).length;
+    $('sum-title').style.setProperty('--sum-c', best.tier === 'N' ? '#b4f01e' : TCOL[best.tier]);
+    $('sum-title').innerHTML = `這包最好的是 ${T.code}「<span>${esc(best.name)}</span>」` + (nNew ? `，新增 ${nNew} 張到圖鑑` : '');
+    if (!already) await Promise.all(cards.map((g, i) => wait(i * 0.06).then(() => poseTo(g, fanPose(i), 0.7, ease.inOut))));
+    if (job) cacheFaces(job);
+    if (!next) prepareNext();
+  }
+
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(-9, -9);
+  let down = null, hovered = null;
+  function setNDC(e) { const r = canvas.getBoundingClientRect(); ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); }
+  function hitCard() {
+    ray.setFromCamera(ndc, camera);
+    const hits = ray.intersectObjects(cards.map(g => g.userData.front), false);
+    return hits.length ? cards.find(g => g.userData.front === hits[0].object) : null;
+  }
+  canvas.addEventListener('pointerdown', e => {
+    setNDC(e);
+    canvas.setPointerCapture(e.pointerId);
+    down = { x: e.clientX, y: e.clientY, lx: e.clientX, t: performance.now(), mode: 'none', moved: 0 };
+    if (state === 'pack') {
+      ray.setFromCamera(ndc, camera);
+      const hit = ray.intersectObjects([bodyF, bodyB, stripF, stripB], false)[0];
+      if (hit) { const lp = packG.worldToLocal(hit.point.clone()); down.mode = lp.y > seamY - 0.45 ? 'tear' : 'spin'; }
+      else down.mode = 'spin';
+    }
+  });
+  canvas.addEventListener('pointermove', e => {
+    setNDC(e);
+    if (!down) return;
+    const dx = e.clientX - down.x;
+    const lx = down.lx; down.lx = e.clientX;
+    down.moved = Math.max(down.moved, Math.hypot(dx, e.clientY - down.y));
+    if (state !== 'pack') return;
+    if (down.mode === 'tear') {
+      setTear(Math.min(1, Math.max(0, dx / (canvas.clientWidth * 0.28))));
+      if (tearP >= 1) { down.mode = 'none'; openPack(); }
+    } else if (down.mode === 'spin') {
+      const step = (e.clientX - lx) * 0.012;
+      yawUser += step; yawVel = step;
+    }
+  });
+  function endPointer(e) {
+    if (!down) return;
+    const tap = down.moved < 8 && performance.now() - down.t < 600;
+    if (state === 'pack' && down.mode === 'tear') {
+      if (tearP > 0.7) openPack();
+      else { const from = tearP; tween(0.25, k => setTear(lerp(from, 0, k)), ease.out); }
+    }
+    if (tap) {
+      if (state === 'reveal') advance();
+      else if (state === 'summary') { setNDC(e); const g = hitCard(); if (g) openModal(g.userData.card); }
+    }
+    down = null;
+  }
+  canvas.addEventListener('pointerup', endPointer);
+  canvas.addEventListener('pointercancel', () => { down = null; if (state === 'pack' && tearP < 1) setTear(0); });
+  canvas.addEventListener('pointerleave', () => { if (!down) ndc.set(-9, -9); });
+  canvas.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    if (state === 'pack') autoTear(); else if (state === 'reveal') advance();
+  });
+  $('btn-tear').addEventListener('click', autoTear);
+  $('btn-skip').addEventListener('click', skipAll);
+  $('btn-again').addEventListener('click', resetPack);
+  $('btn-to-dex').addEventListener('click', () => setTab('dex'));
+
+  const clock = new THREE.Clock();
+  const tmp = new THREE.Vector3();
+  let running = true, perfAcc = 0, perfN = 0;
+  onTabOpen = () => { resize(); };
+  document.addEventListener('visibilitychange', () => { running = !document.hidden; if (running) { clock.getDelta(); requestAnimationFrame(frame); } });
+  let stageOn = true;
+  new IntersectionObserver(es => { stageOn = es[0].isIntersecting; if (stageOn) resize(); }).observe(stage);
+  function frame() {
+    if (!running) return;
+    if (!stageOn) { clock.getDelta(); requestAnimationFrame(frame); return; }
+    const dt = Math.min(clock.getDelta(), 0.05);
+    const t = clock.elapsedTime;
+    const nowMs = performance.now();
+    tweens.forEach(tw => { const k = Math.min(1, (nowMs - tw.t0) / tw.d); tw.fn(tw.e(k)); if (k >= 1) { tweens.delete(tw); tw.res(); } });
+    if (state === 'pack' || state === 'swapping') {
+      if (state === 'pack' && (!down || down.mode !== 'spin')) { yawUser += yawVel; yawVel *= 0.93; yawUser *= 0.985; }
+      packG.rotation.y = (reduce ? 0 : Math.sin(t * 0.7) * 0.22) + yawUser;
+      packG.rotation.x = reduce ? 0 : Math.sin(t * 0.9) * 0.04;
+      packG.position.y = L.packY + (reduce ? 0 : Math.sin(t * 1.4) * 0.05);
+    }
+    if (packRays.visible) packRays.children.forEach(m => { m.rotation.z = m.userData.base + Math.sin(t * 1.3 + m.userData.ph) * 0.06; });
+    if (cardRays.visible) {
+      cardRays.rotation.z += dt * 0.25;
+      const top = cards[cur];
+      const on = state === 'reveal' && top && top.userData.up && TIERS[top.userData.card.tier].rank >= 3;
+      const tier = top ? top.userData.card.tier : 'SSR';
+      cardRays.children.forEach((m, i) => {
+        if (tier === 'SEC') m.material.color.setHSL((t * 0.2 + i / 12) % 1, 1, 0.65); else m.material.color.set(TCOL[tier] || '#ffcc45');
+        m.material.opacity = lerp(m.material.opacity, on ? 0.32 : 0, 0.08);
+      });
+      if (!on && cardRays.children[0].material.opacity < 0.01) cardRays.visible = false;
+    }
+    let focus = null;
+    if (state === 'reveal' && cards[cur] && cards[cur].userData.up && !animBusy) focus = cards[cur];
+    if (state === 'summary') { hovered = ndc.x > -2 ? hitCard() : null; focus = hovered; canvas.classList.toggle('pointer', !!hovered); }
+    else canvas.classList.remove('pointer');
+    const inside = ndc.x > -2;
+    cards.forEach(g => {
+      const X = g.userData.x, P = g.userData.pose;
+      const isF = g === focus && inside;
+      X.ty = lerp(X.ty, isF ? ndc.x * 0.4 : 0, 0.1);
+      X.tx = lerp(X.tx, isF ? -ndc.y * 0.32 : 0, 0.1);
+      X.lift = lerp(X.lift, state === 'summary' && g === hovered ? 1 : 0, 0.12);
+      const bob = state === 'summary' && !reduce ? Math.sin(t * 1.6 + P.p.x * 2) * 0.03 : 0;
+      g.position.set(P.p.x, P.p.y + X.lift * 0.14 + bob, P.p.z + X.lift * 0.4);
+      g.rotation.set(P.r.x + X.tx, P.r.y + X.ty, P.r.z * (1 - X.lift));
+      g.scale.setScalar(P.s * (1 + X.lift * 0.1));
+      const u = g.userData.front.material.uniforms;
+      u.uTime.value = t;
+      g.updateMatrixWorld(true);
+      u.uCam.value.copy(tmp.copy(camera.position)); g.userData.front.worldToLocal(u.uCam.value);
+    });
+    const top = state === 'reveal' ? cards[cur] : null;
+    const rank = top ? TIERS[top.userData.card.tier].rank : 0;
+    if (top && !top.userData.up && rank >= 1) {
+      const tier = top.userData.card.tier;
+      if (tier === 'SEC') aura.material.color.setHSL((t * 0.35) % 1, 1, 0.62); else aura.material.color.set(TCOL[tier]);
+      aura.position.set(top.position.x, top.position.y, top.position.z - 0.08);
+      const pulse = reduce ? 0.7 : 0.6 + 0.25 * Math.sin(t * 6);
+      aura.scale.setScalar(CARD_H * top.scale.x * (rank === 1 ? 1.45 : 1.8 + rank * 0.12) * (1 + 0.05 * Math.sin(t * 6)));
+      aura.material.opacity = lerp(aura.material.opacity, (rank === 1 ? 0.4 : 0.85) * pulse, 0.15);
+    } else aura.material.opacity = lerp(aura.material.opacity, 0, 0.15);
+    if (bLife > 0) {
+      bLife -= dt * 0.75;
+      for (let i = 0; i < BN; i++) {
+        bPos[i * 3] += bVel[i * 3] * dt; bPos[i * 3 + 1] += bVel[i * 3 + 1] * dt; bPos[i * 3 + 2] += bVel[i * 3 + 2] * dt;
+        bVel[i * 3] *= 0.97; bVel[i * 3 + 1] = bVel[i * 3 + 1] * 0.97 - dt * 1.6; bVel[i * 3 + 2] *= 0.97;
+      }
+      bGeo.attributes.position.needsUpdate = true;
+      bMat.opacity = Math.max(0, bLife);
+      flash.scale.addScalar(dt * 9);
+      flash.material.opacity = Math.max(0, bLife * bLife);
+    }
+    const dp = dust.geometry.attributes.position;
+    if (!reduce) { for (let i = 0; i < dp.count; i++) { let y = dp.getY(i) + dt * 0.08; if (y > 3) y = -3; dp.setY(i, y); } dp.needsUpdate = true; }
+    if (uploadQueue.length) uploader.material.map = uploadQueue.shift();
+    renderer.render(scene, camera);
+    perfAcc += dt; perfN++;
+    if (perfN >= 90) {
+      if (perfAcc / perfN > 0.024 && PR > 1) { PR = Math.max(1, PR - 0.25); renderer.setPixelRatio(PR); resize(); }
+      perfAcc = 0; perfN = 0;
+    }
+    requestAnimationFrame(frame);
+  }
+
+  new ResizeObserver(() => { if (!$('view-open').hidden) resize(); }).observe(stage);
+  resize();
+  requestAnimationFrame(frame);
+  Promise.all([Promise.all(PACKS.map(p => drawPackFront(p))), drawPackBack(1), drawPackBack(2)]).then(([fronts, b1, b2]) => {
+    PACKS.forEach((p, i) => packTex[p.id] = canvasTex(fronts[i]));
+    packBackTex[1] = canvasTex(b1); packBackTex[2] = canvasTex(b2);
+    applyCover(S.cover);
+    Object.values(packBackTex).forEach(t => uploadQueue.push(t));
+    const warm = makeCard3D(CARDS[0]); warm.position.set(0, 0, -3); scene.add(warm);
+    const wasVisible = packRays.visible; packRays.visible = cardRays.visible = true;
+    try { renderer.compile(scene, camera); } catch (e) {}
+    packRays.visible = wasVisible; cardRays.visible = false;
+    Object.values(packTex).forEach(t => uploadQueue.push(t));
+    requestAnimationFrame(() => { scene.remove(warm); disposeCard(warm); });
+    $('loading').hidden = true;
+    resetPack();
+  });
+  ui('loading');
+})();
+</script>
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const story = $('story'), canvas = $('story-gl');
+  const D = window.__noxDraw;
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const scenes = [...story.querySelectorAll('.scene')].map(el => ({ el, a: +el.dataset.in, b: +el.dataset.out }));
+  const flashEl = $('flash'), hint = $('scroll-hint');
+  const clamp01 = v => Math.max(0, Math.min(1, v));
+  const lin = (a, b, x) => clamp01((x - a) / (b - a));
+  const sm = (a, b, x) => { const t = lin(a, b, x); return t * t * (3 - 2 * t); };
+  const TK = ['N', 'R', 'SR', 'SSR', 'UR', 'SEC'];
+  const tn = k => D.CARDS.filter(c => c.tier === k).length;
+  const TINFO = {
+    N: { name: '普通', desc: `深灰卡框配一條細綠線，最常遇到的夥伴。三彈共 ${tn('N')} 種。` },
+    R: { name: '稀有', desc: `銀色拉絲卡框，四角有綠色角標。三彈共 ${tn('R')} 種。` },
+    SR: { name: '超稀有', desc: `銀底彩虹鐳射卡框，換個角度就換一種光。三彈共 ${tn('SR')} 種。` },
+    SSR: { name: '特級稀有', desc: `金色雙線卡框，鑲著菱形裝飾。三彈共 ${tn('SSR')} 種。` },
+    UR: { name: '究極稀有', desc: `全圖卡，冰晶邊框與碎鑽。三彈只有 ${tn('UR')} 種。` },
+    SEC: { name: '秘藏', desc: '彩虹全息全圖卡，每一彈只有 1 張。' }
+  };
+  const TCOL = { N: '#e9eee0', R: '#e6ebf2', SR: '#9fd0ff', SSR: '#ffcc45', UR: '#9ef0ff', SEC: '#ff8ae6' };
+  function tierState(p) {
+    const f = lin(0.43, 0.6, p) * 6;
+    const i = Math.min(5, Math.floor(f)), fr = f - i;
+    const spin = i < 5 ? sm(0.7, 1, fr) : 0;
+    return { i, spin, shown: Math.min(5, i + (spin > 0.5 ? 1 : 0)) };
+  }
+  let shownTier = -1;
+  const dots = $('tier-dots');
+  dots.innerHTML = TK.map(k => `<i style="--tc:${TCOL[k]}"></i>`).join('');
+  function setTierText(i) {
+    if (i === shownTier) return;
+    shownTier = i;
+    const k = TK[i], T = TINFO[k];
+    $('tier-ghost').textContent = k;
+    $('tier-code').textContent = k;
+    $('tier-code').style.color = k === 'N' ? '#f2f5ea' : TCOL[k];
+    $('tier-name').textContent = T.name;
+    $('tier-desc').textContent = T.desc;
+    [...dots.children].forEach((d, j) => d.classList.toggle('on', j <= i));
+  }
+  function updateText(p) {
+    scenes.forEach((s, idx) => {
+      const fin = idx === 0 ? 1 : sm(s.a, s.a + 0.035, p);
+      const fout = s.b >= 1 ? 1 : 1 - sm(s.b - 0.035, s.b, p);
+      const o = fin * fout;
+      s.el.style.setProperty('--o', o.toFixed(3));
+      s.el.style.setProperty('--l', lin(s.a, s.b, p).toFixed(3));
+      s.el.style.visibility = o < 0.01 ? 'hidden' : 'visible';
+    });
+    const f = Math.max(0, 1 - Math.abs(p - 0.872) / 0.024);
+    flashEl.style.opacity = (reduce ? f * 0.35 : f).toFixed(3);
+    hint.style.opacity = (1 - sm(0.005, 0.04, p)).toFixed(3);
+    setTierText(tierState(p).shown);
+  }
+
+  let target = 0, prog = 0;
+  function readScroll() {
+    const r = story.getBoundingClientRect();
+    target = clamp01(-r.top / Math.max(1, story.offsetHeight - innerHeight));
+  }
+  addEventListener('scroll', readScroll, { passive: true });
+  addEventListener('resize', readScroll);
+  readScroll();
+
+  let renderer = null;
+  if (D && typeof THREE !== 'undefined') { try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' }); } catch (e) {} }
+  if (!renderer) {
+    story.classList.add('no-gl');
+    scenes.forEach(s => { s.el.style.setProperty('--o', '1'); s.el.style.visibility = 'visible'; });
+    setTierText(3);
+    return;
+  }
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
+  renderer.setClearColor(0x000000, 0);
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
+  {
+    const env = new THREE.Scene();
+    env.add(new THREE.Mesh(new THREE.BoxGeometry(20, 20, 20), new THREE.MeshBasicMaterial({ color: 0x0b0d09, side: THREE.BackSide })));
+    const panel = (color, w, h, pos) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide })); m.position.set(...pos); m.lookAt(0, 0, 0); env.add(m); };
+    panel(0xffffff, 8, 3, [0, 7, 4]); panel(0xb4f01e, 3, 9, [-8, 0, 3]); panel(0xffd0a0, 3, 9, [8, 1, 2]);
+    const pm = new THREE.PMREMGenerator(renderer);
+    scene.environment = pm.fromScene(env, 0.04).texture; pm.dispose();
+  }
+  scene.add(new THREE.HemisphereLight(0xf4ffe0, 0x14200a, 0.7));
+  const key = new THREE.DirectionalLight(0xffffff, 0.8); key.position.set(2, 4, 6); scene.add(key);
+
+  const tex = cv => { const t = new THREE.CanvasTexture(cv); t.anisotropy = renderer.capabilities.getMaxAnisotropy(); return t; };
+  const glowTex = (() => {
+    const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d');
+    const g = x.createRadialGradient(64, 64, 0, 64, 64, 64); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.35, 'rgba(255,255,255,.4)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = g; x.fillRect(0, 0, 128, 128); return new THREE.CanvasTexture(c);
+  })();
+  const idle = () => new Promise(r => (window.requestIdleCallback ? requestIdleCallback(() => r(), { timeout: 600 }) : setTimeout(r, 40)));
+
+  // coloured light blobs behind everything
+  const blobs = [0, 1, 2].map(i => {
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xffffff, transparent: true, opacity: 0.3, depthWrite: false, blending: THREE.AdditiveBlending }));
+    s.scale.set(6.5, 6.5, 1); s.renderOrder = -5; scene.add(s); return s;
+  });
+  const SCOL = {
+    hero: ['#b4f01e', '#ff9a3c', '#3d6bff'], bubbles: ['#ff7ae0', '#5aa8ff', '#b4f01e'], ring: ['#b4f01e', '#9a7dff', '#48e3ea'], cta: ['#b4f01e', '#e9ffd0', '#8eb943'],
+    N: ['#b4f01e', '#6b7a5a', '#3a4030'], R: ['#e6ebf2', '#8f9bb0', '#b4f01e'], SR: ['#9fd0ff', '#ff9ad8', '#b9ffcf'],
+    SSR: ['#ffcc45', '#ff8a3c', '#fff2ad'], UR: ['#9ef0ff', '#ffffff', '#7f9cff'], SEC: ['#ff6b6b', '#6bc8ff', '#c77bff']
+  };
+  const tmpC = new THREE.Color();
+
+  // pack (pillow-shaped)
+  const PACK_W = 1.5, PACK_H = 2.4;
+  function pillow(puff) {
+    const g = new THREE.PlaneGeometry(PACK_W, PACK_H, 24, 36), p = g.attributes.position, uv = g.attributes.uv;
+    for (let i = 0; i < p.count; i++) p.setZ(i, puff * Math.pow(Math.sin(Math.PI * uv.getX(i)), 0.55) * Math.pow(Math.sin(Math.PI * uv.getY(i)), 0.35));
+    g.computeVertexNormals(); return g;
+  }
+  const packG = new THREE.Group(); scene.add(packG);
+  const pGeo = pillow(0.1);
+  const pFront = new THREE.MeshStandardMaterial({ color: 0x222820, metalness: 0.3, roughness: 0.38 });
+  const pBack = pFront.clone();
+  const pf = new THREE.Mesh(pGeo, pFront), pb = new THREE.Mesh(pGeo, pBack); pb.rotation.y = Math.PI;
+  packG.add(pf, pb);
+  D.drawPackFront(D.PACKS[0]).then(cv => { pFront.map = tex(cv); pFront.color.set(0xffffff); pFront.needsUpdate = true; });
+  D.drawPackBack().then(cv => { pBack.map = tex(cv); pBack.color.set(0xffffff); pBack.needsUpdate = true; });
+
+  // glass bubbles with the 27 avatars
+  async function bubbleTex(n) {
+    const img = await D.loadArt(n);
+    const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d');
+    x.save(); x.beginPath(); x.arc(128, 128, 124, 0, Math.PI * 2); x.clip();
+    if (img) { const s = 300; x.drawImage(img, 128 - s / 2 + 12, 128 - s / 2 + 18, s, s); }
+    let g = x.createRadialGradient(128, 128, 70, 128, 128, 126); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,.55)');
+    x.fillStyle = g; x.fillRect(0, 0, 256, 256);
+    g = x.createRadialGradient(92, 78, 4, 92, 78, 90); g.addColorStop(0, 'rgba(255,255,255,.75)'); g.addColorStop(0.35, 'rgba(255,255,255,.18)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = g; x.fillRect(0, 0, 256, 256);
+    x.restore();
+    const rim = x.createLinearGradient(0, 0, 256, 256);
+    ['rgba(255,140,220,.7)', 'rgba(255,255,255,.85)', 'rgba(140,220,255,.7)', 'rgba(200,255,140,.6)'].forEach((col, i) => rim.addColorStop(i / 3, col));
+    x.lineWidth = 4; x.strokeStyle = rim; x.beginPath(); x.arc(128, 128, 122, 0, Math.PI * 2); x.stroke();
+    x.fillStyle = 'rgba(255,255,255,.9)'; x.beginPath(); x.ellipse(176, 196, 14, 6, -0.7, 0, Math.PI * 2); x.fill();
+    return tex(c);
+  }
+  const bubbleG = new THREE.Group(); scene.add(bubbleG);
+  const bubbles = [];
+  {
+    const N = 50, R = (() => { let a = 7; return () => { a = (a * 16807) % 2147483647; return a / 2147483647; }; })();
+    for (let i = 0; i < N; i++) {
+      const y = 1 - (i + 0.5) / N * 2, rr = Math.sqrt(1 - y * y), th = i * 2.399963;
+      const rad = 0.55 + 0.95 * Math.cbrt(R());
+      const base = new THREE.Vector3(Math.cos(th) * rr * rad * 1.3, y * rad, Math.sin(th) * rr * rad);
+      const s = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, opacity: 0, depthWrite: false }));
+      const size = 0.38 + R() * 0.5 + (1.5 - rad) * 0.15;
+      bubbleG.add(s);
+      bubbles.push({ s, base, size, ready: false, ph: R() * 6 });
+    }
+  }
+  const bubbleTexCache = {};
+  (async () => {
+    for (let i = 0; i < bubbles.length; i++) {
+      const n = i + 1;
+      if (!bubbleTexCache[n]) { await idle(); bubbleTexCache[n] = await bubbleTex(n); }
+      bubbles[i].s.material.map = bubbleTexCache[n]; bubbles[i].s.material.needsUpdate = true; bubbles[i].ready = true;
+    }
+  })();
+
+  // card geometry
+  const CW3 = 1.26, CH3 = 1.76;
+  const shape = new THREE.Shape(); {
+    const w = CW3, h = CH3, r = 0.063, x0 = -w / 2, y0 = -h / 2;
+    shape.moveTo(x0 + r, y0); shape.lineTo(x0 + w - r, y0); shape.quadraticCurveTo(x0 + w, y0, x0 + w, y0 + r);
+    shape.lineTo(x0 + w, y0 + h - r); shape.quadraticCurveTo(x0 + w, y0 + h, x0 + w - r, y0 + h);
+    shape.lineTo(x0 + r, y0 + h); shape.quadraticCurveTo(x0, y0 + h, x0, y0 + h - r);
+    shape.lineTo(x0, y0 + r); shape.quadraticCurveTo(x0, y0, x0 + r, y0);
+  }
+  const faceGeo = new THREE.ShapeGeometry(shape, 6);
+  { const p = faceGeo.attributes.position, uv = faceGeo.attributes.uv; for (let i = 0; i < p.count; i++) uv.setXY(i, (p.getX(i) + CW3 / 2) / CW3, (p.getY(i) + CH3 / 2) / CH3); }
+  const backTex = tex(D.drawCardBack());
+  D.fontsReady.then(() => { backTex.image = D.drawCardBack(); backTex.needsUpdate = true; });
+  const backMat = new THREE.MeshBasicMaterial({ map: backTex, transparent: true });
+  function card3D(front) {
+    const g = new THREE.Group();
+    const f = new THREE.Mesh(faceGeo, front); f.position.z = 0.004;
+    const b = new THREE.Mesh(faceGeo, backMat); b.position.z = -0.004; b.rotation.y = Math.PI;
+    g.add(f, b); return g;
+  }
+
+  // the tier showcase card
+  const SHOW_IDS = [3, 2, 11, 6, 23, 27];
+  const showTex = [];
+  const showMat = new THREE.MeshBasicMaterial({ map: backTex, transparent: true, alphaTest: 0.5 });
+  const showCard = card3D(showMat); scene.add(showCard);
+  const showGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
+  scene.add(showGlow);
+
+  // the ring of all 27 cards
+  const ringG = new THREE.Group(); scene.add(ringG);
+  const PER_ROW = 25, RING_R = PER_ROW * CW3 * 1.12 / (Math.PI * 2);
+  const ringMats = [];
+  for (let i = 0; i < 50; i++) {
+    const m = new THREE.MeshBasicMaterial({ map: backTex, transparent: true, opacity: 1 });
+    ringMats.push(m);
+    const row = i < PER_ROW ? 0 : 1, th = ((i % PER_ROW) + row * 0.5) / PER_ROW * Math.PI * 2;
+    const c = card3D(m);
+    c.position.set(Math.sin(th) * RING_R, row ? -0.98 : 0.98, Math.cos(th) * RING_R); c.rotation.y = th;
+    ringG.add(c);
+  }
+  (async () => {
+    await D.fontsReady;
+    for (let k = 0; k < 6; k++) { await idle(); showTex[k] = tex(await D.drawCardFace(D.CARDS[SHOW_IDS[k] - 1])); }
+    shownTex = -1;
+    for (let i = 0; i < 50; i++) {
+      await idle();
+      const big = await D.drawCardFace(D.CARDS[i]);
+      const sm2 = document.createElement('canvas'); sm2.width = 300; sm2.height = 419;
+      const x = sm2.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(big, 0, 0, 300, 419);
+      ringMats[i].map = tex(sm2); ringMats[i].needsUpdate = true;
+    }
+  })();
+
+  // layout
+  const L = {};
+  function resize() {
+    const w = canvas.clientWidth || innerWidth, h = canvas.clientHeight || innerHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    L.z = camera.aspect < 1 ? 7.4 / Math.max(camera.aspect, 0.45) * 0.68 : 7.4;
+    const t2 = 2 * Math.tan(THREE.MathUtils.degToRad(17.5));
+    L.visH = L.z * t2; L.visW = L.visH * camera.aspect;
+    L.packS = Math.min(1, L.visH * 0.5 / PACK_H, L.visW * 0.55 / PACK_W);
+    L.bubS = Math.min(1.05, L.visW * 0.48 / 3.9, L.visH * 0.62 / 3.0);
+    L.cardS = Math.min(1.12, L.visH * 0.46 / CH3, L.visW * 0.6 / CW3);
+    L.ringS = Math.min(0.8, L.visW / 7.5 + 0.2, L.visH / 5.4);
+    camera.updateProjectionMatrix();
+  }
+  addEventListener('resize', resize); resize();
+
+  const ptr = { x: 0, y: 0, tx: 0, ty: 0 };
+  addEventListener('pointermove', e => { ptr.tx = e.clientX / innerWidth * 2 - 1; ptr.ty = -(e.clientY / innerHeight * 2 - 1); }, { passive: true });
+  let onScreen = true;
+  new IntersectionObserver(es => { onScreen = es[0].isIntersecting; }).observe(story);
+
+  const clock = new THREE.Clock();
+  let shownTex = -1;
+  function frame() {
+    requestAnimationFrame(frame);
+    if (!onScreen || document.hidden) { clock.getDelta(); return; }
+    const dt = Math.min(clock.getDelta(), 0.05), t = reduce ? 0 : clock.elapsedTime;
+    prog += (target - prog) * (reduce ? 1 : Math.min(1, dt * 7));
+    const p = prog;
+    updateText(p);
+
+    // light blobs
+    const ts = tierState(p);
+    const key2 = p < 0.17 ? 'hero' : p < 0.4 ? 'bubbles' : p < 0.62 ? TK[ts.shown] : p < 0.85 ? 'ring' : 'cta';
+    blobs.forEach((b, i) => {
+      if (key2 === 'SEC') tmpC.setHSL((clock.elapsedTime * 0.12 + i / 3) % 1, 0.9, 0.62); else tmpC.set(SCOL[key2][i]);
+      b.material.color.lerp(tmpC, 0.06);
+      b.position.set(Math.cos(t * 0.21 + i * 2.1) * 2.3, Math.sin(t * 0.27 + i * 1.7) * 1.2, -3);
+      b.material.opacity = 0.26;
+    });
+
+    // pack: hero, then returns for the call to action
+    const heroK = 1 - sm(0.14, 0.24, p), ctaK = sm(0.88, 0.97, p);
+    packG.visible = heroK > 0.01 || ctaK > 0.01;
+    if (heroK >= ctaK) {
+      const spin = lin(0, 0.17, p) * Math.PI * 1.25;
+      packG.rotation.set(-0.06 + Math.sin(t * 0.8) * 0.03, -0.45 + spin + Math.sin(t * 0.6) * 0.1, Math.sin(t * 0.5) * 0.03);
+      packG.position.set(0, 0.12 + Math.sin(t * 1.2) * 0.05, -(1 - heroK) * 2.2);
+      packG.scale.setScalar(L.packS * Math.max(0.001, 0.25 + 0.75 * heroK) * (heroK < 0.02 ? 0 : 1));
+    } else {
+      packG.rotation.set(-0.05, t * 0.5 + (1 - ctaK) * 3, Math.sin(t * 0.7) * 0.04);
+      packG.position.set(0, 0.42 * L.visH / 4.6 + Math.sin(t * 1.3) * 0.05, 0);
+      packG.scale.setScalar(L.packS * 0.82 * Math.max(0.001, ctaK));
+    }
+
+    // bubbles burst out of the pack and cluster
+    const bin = sm(0.15, 0.27, p), bout = sm(0.37, 0.47, p), bv = bin * (1 - bout);
+    bubbleG.visible = bv > 0.004;
+    if (bubbleG.visible) {
+      bubbleG.rotation.set(Math.sin(t * 0.2) * 0.15, t * 0.12 + p * 5, 0);
+      bubbleG.scale.setScalar(L.bubS);
+      bubbles.forEach(b => {
+        const k = bin * (1 + bout * 3.4);
+        b.s.position.copy(b.base).multiplyScalar(k);
+        b.s.position.y += Math.sin(t * 1.1 + b.ph) * 0.05;
+        b.s.scale.setScalar(b.size * (0.25 + 0.75 * bin));
+        b.s.material.opacity = b.ready ? bv : 0;
+      });
+    }
+
+    // single card cycling through the six rarities
+    const cin = sm(0.385, 0.45, p), cout = sm(0.6, 0.665, p), cv = cin * (1 - cout);
+    showCard.visible = cv > 0.004;
+    if (showCard.visible) {
+      if (ts.shown !== shownTex && showTex[ts.shown]) { showMat.map = showTex[ts.shown]; showMat.needsUpdate = true; shownTex = ts.shown; }
+      showCard.scale.setScalar(L.cardS * (0.35 + 0.65 * cin) * (1 - 0.55 * cout));
+      showCard.position.set(0, 0.08, -(1 - cin) * 2 - cout * 1.5);
+      ptr.x += (ptr.tx - ptr.x) * 0.06; ptr.y += (ptr.ty - ptr.y) * 0.06;
+      showCard.rotation.set(-ptr.y * 0.22 + Math.sin(t * 0.9) * 0.04, (ts.i + ts.spin) * Math.PI * 2 + (1 - cin) * Math.PI + ptr.x * 0.35, Math.sin(t * 0.6) * 0.03);
+      showGlow.position.set(0, 0.08, showCard.position.z - 0.3);
+      showGlow.scale.setScalar(4.2 * showCard.scale.x);
+      tmpC.set(TK[ts.shown] === 'N' ? '#b4f01e' : TCOL[TK[ts.shown]]);
+      showGlow.material.color.lerp(tmpC, 0.08);
+      showGlow.material.opacity = 0.55 * cv;
+    } else showGlow.material.opacity = 0;
+
+    // the ring of 27
+    const rin = sm(0.6, 0.69, p), rout = sm(0.82, 0.875, p), rv = rin * (1 - rout);
+    ringG.visible = rv > 0.004;
+    if (ringG.visible) {
+      const s = L.ringS * (0.6 + 0.4 * rin);
+      ringG.scale.setScalar(s);
+      ringG.position.set(0, -0.05 + rout * 1.2, -RING_R * s + 1.2);
+      ringG.rotation.set(0.14, lin(0.6, 0.87, p) * Math.PI * 2.2 + t * 0.04, -0.03);
+      ringMats.forEach(m => { m.opacity = rv; });
+      backMat.opacity = rv;
+    } else backMat.opacity = 1;
+
+    ptr.x += (ptr.tx - ptr.x) * 0.04; ptr.y += (ptr.ty - ptr.y) * 0.04;
+    camera.position.set(ptr.x * 0.35, ptr.y * 0.22, L.z);
+    camera.lookAt(0, 0, 0);
+    renderer.render(scene, camera);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+<script src="market.js"></script>
+</body>
+</html>
